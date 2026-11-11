@@ -1,0 +1,113 @@
+//! Markdown -> Typst -> PDF as a library.
+//!
+//! A template is a self-contained folder with a `template.typ` entry point, or
+//! an embedded template built from source (see [`templates`]).
+
+pub mod error;
+mod fonts;
+pub mod markdown;
+pub mod templates;
+pub mod world;
+
+pub use error::Error;
+pub use templates::{Template, TemplateEntry, TemplateOptions};
+
+use std::time::Instant;
+
+use tracing::debug;
+use typst::{World, WorldExt};
+
+use crate::world::PdfWorld;
+
+/// A rendered document: the intermediate Typst source and the PDF bytes.
+#[derive(Debug)]
+pub struct Rendered {
+    pub typst: String,
+    pub pdf: Vec<u8>,
+}
+
+/// Render Markdown with a loaded template.
+pub fn render(markdown: &str, template: &Template) -> Result<Rendered, Error> {
+    let doc = markdown::parse(markdown);
+    debug!(
+        markdown_bytes = markdown.len(),
+        title = doc.meta.get("title").map(String::as_str).unwrap_or("-"),
+        "parsed Markdown"
+    );
+
+    let typst = template.build(&doc)?;
+    debug!(typst_bytes = typst.len(), "generated Typst");
+
+    let started = Instant::now();
+    let world = PdfWorld::new(
+        typst,
+        template.asset_dir().map(|path| path.to_path_buf()),
+        template.options().use_system_fonts,
+    );
+    debug!(
+        elapsed_ms = started.elapsed().as_millis(),
+        "created Typst world"
+    );
+
+    let started = Instant::now();
+    let compiled = typst::compile::<typst_layout::PagedDocument>(&world);
+    let document = compiled.output.map_err(|errors| Error::Compile {
+        messages: format_errors(&world, &errors),
+    })?;
+    debug!(elapsed_ms = started.elapsed().as_millis(), "compiled Typst");
+
+    let started = Instant::now();
+    let pdf = typst_pdf::pdf(&document, &typst_pdf::PdfOptions::default()).map_err(|errors| {
+        Error::Export {
+            messages: format_errors(&world, &errors),
+        }
+    })?;
+    debug!(elapsed_ms = started.elapsed().as_millis(), "exported PDF");
+
+    let typst = world.source_text().to_owned();
+    Ok(Rendered { typst, pdf })
+}
+
+fn format_errors(world: &PdfWorld, errors: &[typst::diag::SourceDiagnostic]) -> String {
+    let mut out = String::new();
+    for error in errors {
+        if let Some(id) = error.span.id() {
+            out.push_str(id.vpath().get_without_slash());
+            if let Some(range) = world.range(error.span)
+                && let Ok(source) = world.source(id)
+                && let Some((line, column)) = source.lines().byte_to_line_column(range.start)
+            {
+                out.push_str(&format!(":{}:{}", line + 1, column + 1));
+            }
+            out.push_str(": ");
+        }
+        out.push_str(&error.message);
+        for hint in &error.hints {
+            out.push_str("\n  hint: ");
+            out.push_str(hint.v.as_str());
+        }
+        out.push('\n');
+    }
+    out.pop();
+    out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn compile_errors_include_a_source_location() {
+        let template = Template::from_source(
+            r#"#let template(title: none, body) = { body }
+#panic("boom")"#,
+            "test.typ",
+            TemplateOptions::default(),
+        )
+        .expect("build template");
+
+        let error = render("Hello", &template).expect_err("expected a compile error");
+        let message = error.to_string();
+        assert!(message.contains("main.typ:"), "{message}");
+    }
+}
