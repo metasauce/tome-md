@@ -24,7 +24,7 @@ cli/                      tome-md binary
 │  └─ plain.typ           bundled default template
 └─ tests/cli.rs           end-to-end CLI tests
 
-templates/                example templates (letter-din, cv, notes, flyer)
+templates/                example templates (letter-din, cv, notes, recipe, flyer)
 ```
 
 `core` owns the Typst, Markdown and font dependencies. `cli` owns clap, anyhow,
