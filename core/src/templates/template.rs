@@ -25,6 +25,7 @@ const GITHUB_ALERT_HELPER: &str = r##"#let _tome_md_github_alert(kind, body) = {
   let style = styles.at(kind)
   block(
     width: 100%,
+    breakable: false,
     fill: style.fill,
     stroke: (left: 4pt + style.color),
     inset: (x: 12pt, y: 8pt),

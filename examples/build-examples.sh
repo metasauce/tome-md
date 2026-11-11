@@ -11,7 +11,7 @@ if ! command -v "$tome" >/dev/null 2>&1; then
 fi
 
 # Each example writes its rendered PDF next to example.md.
-for name in letter-din cv notes recipe flyer; do
+for name in letter-din cv notes recipe flyer feature_tour; do
   "$tome" "$script_dir/$name/example.md" \
     --template "$script_dir/$name/template.typ" \
     --output "$script_dir/$name/example.pdf" \
