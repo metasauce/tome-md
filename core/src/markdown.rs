@@ -321,6 +321,7 @@ struct Emitter {
     list_stack: Vec<ListState>,
     code_block: Option<CodeBlock>,
     link_stack: Vec<bool>,
+    image: Option<ImageState>,
     table: Option<Table>,
     cell: Option<String>,
 }
@@ -334,6 +335,10 @@ struct ListState {
 struct CodeBlock {
     lang: String,
     text: String,
+}
+
+struct ImageState {
+    alt: String,
 }
 
 struct Table {
@@ -352,6 +357,7 @@ impl Emitter {
             list_stack: Vec::new(),
             code_block: None,
             link_stack: Vec::new(),
+            image: None,
             table: None,
             cell: None,
         }
@@ -394,6 +400,25 @@ impl Emitter {
     }
 
     fn event(&mut self, event: Event<'_>) {
+        if let Some(image) = &mut self.image {
+            match event {
+                Event::Text(text) => image.alt.push_str(&text),
+                Event::Code(code) => image.alt.push_str(&code),
+                Event::SoftBreak | Event::HardBreak => image.alt.push(' '),
+                Event::End(TagEnd::Image) => {
+                    let image = self.image.take().expect("image state");
+                    if !image.alt.trim().is_empty() {
+                        self.write(", alt: \"");
+                        self.write(&escape_string(image.alt.trim()));
+                        self.write("\"");
+                    }
+                    self.write(")");
+                }
+                _ => {}
+            }
+            return;
+        }
+
         match event {
             Event::Start(tag) => self.start(tag),
             Event::End(tag) => self.end(tag),
@@ -463,8 +488,12 @@ impl Emitter {
                     self.link_stack.push(true);
                 }
             }
-            // Images are not fetched in the browser demo; show the alt text.
-            Tag::Image { .. } => self.write("#emph["),
+            Tag::Image { dest_url, .. } => {
+                self.write("#image(\"");
+                self.write(&escape_string(&dest_url));
+                self.write("\"");
+                self.image = Some(ImageState { alt: String::new() });
+            }
             Tag::BlockQuote(_) => self.write("\n#quote(block: true)[\n"),
             Tag::CodeBlock(kind) => {
                 let lang = match kind {
@@ -529,8 +558,7 @@ impl Emitter {
             | TagEnd::Strong
             | TagEnd::Strikethrough
             | TagEnd::Superscript
-            | TagEnd::Subscript
-            | TagEnd::Image => self.write("]"),
+            | TagEnd::Subscript => self.write("]"),
             TagEnd::Link if self.link_stack.pop().unwrap_or(false) => self.write("]"),
             TagEnd::Link => {}
             TagEnd::BlockQuote(_) => self.write("\n]\n\n"),
@@ -827,6 +855,27 @@ mod tests {
         let doc = parse_ok("H<sub>2</sub>O and 15<sup>th</sup>");
         assert!(doc.body().contains("#sub[2]"), "body: {}", doc.body());
         assert!(doc.body().contains("#super[th]"), "body: {}", doc.body());
+    }
+
+    #[test]
+    fn images_keep_their_alt_text() {
+        let doc = parse_ok("![Pumpkin soup](assets/pumpkin-soup.svg)");
+        assert!(
+            doc.body()
+                .contains(r#"#image("assets/pumpkin-soup.svg", alt: "Pumpkin soup")"#),
+            "body: {}",
+            doc.body()
+        );
+    }
+
+    #[test]
+    fn images_without_alt_text() {
+        let doc = parse_ok("![](assets/photo.png)");
+        assert!(
+            doc.body().contains(r#"#image("assets/photo.png")"#),
+            "body: {}",
+            doc.body()
+        );
     }
 
     #[test]

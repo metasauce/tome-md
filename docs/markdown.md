@@ -10,14 +10,18 @@ Supported:
 - inline code and fenced code blocks (the language hint is kept on the fence)
 - ordered lists (including start numbers), unordered lists, nesting, task markers
 - block quotes, tables with header rows and column alignment
+- images with local paths; the Markdown alt text is kept as the image alt
 - links, horizontal rules, hard breaks
 
 Partially supported or not rendered:
 
-- **images** — alt text is rendered as emphasis; the image itself is not fetched
+- **remote images** — not fetched; use a local image path
 - **raw HTML** — dropped, except inline `<sup>` / `<sub>`
 - **math** — dropped
 - **footnotes** — not emitted as footnotes
+
+Image paths are resolved in the template folder by Typst, so keep referenced
+images next to the template or in one of its subfolders.
 
 Unsupported constructs do not fail the render; the emitter just skips what it
 does not model.
