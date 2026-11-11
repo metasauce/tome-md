@@ -1,0 +1,65 @@
+name: Rust checks
+
+on:
+  push:
+    paths:
+      - "**/*.rs"
+      - "**/*.typ"
+      - "**/Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/rust-checks.yml"
+  pull_request:
+    paths:
+      - "**/*.rs"
+      - "**/*.typ"
+      - "**/Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/rust-checks.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rust-checks-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  fmt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions-rust-lang/setup-rust-toolchain@v2
+        with:
+          components: rustfmt
+          cache: false
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+  clippy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions-rust-lang/setup-rust-toolchain@v2
+        with:
+          components: clippy
+      - name: Run clippy
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions-rust-lang/setup-rust-toolchain@v2
+      - name: Run tests
+        run: cargo test --workspace --locked
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions-rust-lang/setup-rust-toolchain@v2
+      - name: Build
+        run: cargo build --workspace --locked --release
