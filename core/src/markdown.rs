@@ -537,8 +537,9 @@ impl Emitter {
                 };
                 self.list_stack.push(state);
                 self.write("\n");
-                if let Some(start) = start {
-                    self.write(&format!("#set enum(start: {start})\n"));
+                if let Some(start) = start.filter(|start| *start != 1) {
+                    let indent = " ".repeat(self.list_stack.len() * 2);
+                    self.write(&format!("{indent}#set enum(start: {start})\n"));
                 }
             }
             Tag::Item => {
@@ -603,14 +604,15 @@ impl Emitter {
             }
             TagEnd::List(_) => {
                 if let Some(state) = self.list_stack.pop()
-                    && state.ordered
+                    && state.start.is_some_and(|start| start != 1)
                 {
                     let restore = self
                         .list_stack
                         .last()
                         .and_then(|parent| parent.start)
                         .unwrap_or(1);
-                    self.write(&format!("#set enum(start: {restore})\n"));
+                    let indent = " ".repeat(self.list_stack.len() * 2);
+                    self.write(&format!("{indent}#set enum(start: {restore})\n"));
                 }
                 if self.list_stack.is_empty() {
                     self.write("\n");
@@ -883,6 +885,16 @@ mod tests {
             "body: {}",
             doc.body()
         );
+    }
+
+    #[test]
+    fn nested_lists_keep_their_indentation() {
+        let doc = parse_ok("- parent\n  - child\n    1. one\n    2. two\n- sibling");
+        let body = doc.body();
+        assert!(body.contains("  - parent"), "{body}");
+        assert!(body.contains("    - child"), "{body}");
+        assert!(body.contains("      + one"), "{body}");
+        assert!(!body.contains("#set enum(start: 1)"), "{body}");
     }
 
     #[test]
