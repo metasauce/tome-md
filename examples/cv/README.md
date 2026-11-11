@@ -4,8 +4,8 @@ A modern single-column CV with a sand-toned header, spice-colored accents,
 section bars and a striped education table.
 
 ```sh
-tome templates/cv/example.md \
-  -t templates/cv/template.typ \
+tome examples/cv/example.md \
+  -t examples/cv/template.typ \
   -o out/cv.pdf
 ```
 

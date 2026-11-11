@@ -22,8 +22,8 @@ The example content is the Finanzamt objection sample from `letter-pro`, with
 fictional names and addresses.
 
 ```sh
-tome templates/letter-din/example.md \
-  -t templates/letter-din/template.typ \
+tome examples/letter-din/example.md \
+  -t examples/letter-din/template.typ \
   -o out/letter-din.pdf
 ```
 

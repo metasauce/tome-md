@@ -21,4 +21,3 @@ viewing of the tributes before the Games.
 - 23:00 Victory ball
 
 **By invitation of the Capitol elite.**
-

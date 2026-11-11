@@ -4,8 +4,8 @@ A cocktail recipe card with a top-right image and a metadata box for portions
 and timings.
 
 ```sh
-tome templates/recipe/example.md \
-  -t templates/recipe/template.typ \
+tome examples/recipe/example.md \
+  -t examples/recipe/template.typ \
   -o out/recipe.pdf
 ```
 

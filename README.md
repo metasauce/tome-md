@@ -93,7 +93,7 @@ Other files in the folder, like fonts and images, are available to the template
 as if they sat next to it. That keeps a template self-contained, so you can copy
 it around or share it as a whole.
 
-For a number of example templates see the templates folder.
+For a number of examples see the [examples](examples/) folder.
 
 See [docs/templates.md](docs/templates.md) for the full rules and font handling.
 
@@ -104,5 +104,7 @@ This project is licensed under the
 
 In short, this license allows broad use for personal, educational, research, and
 non-profit purposes, but forbids commercial use.
+
+If you want to use this commercially, send me an email and we can discuss.
 
 See the [LICENSE](LICENSE) file for the full terms.

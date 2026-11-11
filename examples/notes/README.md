@@ -4,9 +4,8 @@ General meeting notes with a title, date/attendees line and styled Markdown
 blocks.
 
 ```sh
-cargo build -p tome-md
-./target/debug/tome templates/notes/example.md \
-  -t templates/notes/template.typ \
+tome examples/notes/example.md \
+  -t examples/notes/template.typ \
   -o out/notes.pdf
 ```
 

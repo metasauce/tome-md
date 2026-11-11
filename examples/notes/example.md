@@ -14,7 +14,7 @@ attendees: Jane Doe, John Smith, Lisa Park
 
 ## Project updates
 
-The *website redesign* is on track for **15 April**. We will ~~move the launch to May~~ keep the original date and review progress on the 15<sup>th</sup> April.
+The _website redesign_ is on track for **15 April**. We will ~~move the launch to May~~ keep the original date and review progress on the 15<sup>th</sup> April.
 
 ### Action items
 
@@ -41,10 +41,10 @@ Bring comments to the meeting.
 
 ## Budget
 
-| Item | Owner | Status | Cost |
-| :--- | :--- | :---: | ---: |
-| Design | Jane | Done | €2,400 |
-| Content | John | In progress | €1,100 |
-| QA | Lisa | Planned | €900 |
+| Item    | Owner |   Status    |   Cost |
+| :------ | :---- | :---------: | -----: |
+| Design  | Jane  |    Done     | €2,400 |
+| Content | John  | In progress | €1,100 |
+| QA      | Lisa  |   Planned   |   €900 |
 
 See the [project board](https://example.com/board) for details.

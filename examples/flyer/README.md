@@ -4,8 +4,8 @@ An A5 invitation flyer for a Capitol high-society Hunger Games gala. The dark
 ink background, gold frame and accents carry the art-deco mood.
 
 ```sh
-tome templates/flyer/example.md \
-  -t templates/flyer/template.typ \
+tome examples/flyer/example.md \
+  -t examples/flyer/template.typ \
   -o out/flyer.pdf
 ```
 
