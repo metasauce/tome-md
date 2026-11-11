@@ -1,6 +1,8 @@
 //! Markdown -> Typst conversion with a small GFM subset.
 
-use pulldown_cmark::{Alignment, CodeBlockKind, Event, Options, Parser, Tag, TagEnd};
+use pulldown_cmark::{
+    Alignment, BlockQuoteKind, CodeBlockKind, Event, Options, Parser, Tag, TagEnd,
+};
 use serde_yaml_ng::{Mapping, Value};
 
 use crate::error::Error;
@@ -10,6 +12,7 @@ use crate::error::Error;
 pub struct Document {
     pub meta: Meta,
     pub elements: Vec<Element>,
+    has_alerts: bool,
 }
 
 /// One parsed front-matter value.
@@ -104,6 +107,11 @@ pub struct MarkdownTable {
 }
 
 impl Document {
+    /// Whether the document contains GitHub alert blockquotes.
+    pub fn has_alerts(&self) -> bool {
+        self.has_alerts
+    }
+
     /// Concatenated Typst source of all elements.
     pub fn body(&self) -> String {
         let mut out = String::new();
@@ -128,9 +136,11 @@ impl Document {
 /// Parse Markdown (optional `key: value` front matter) and emit elements.
 pub fn parse(markdown: &str) -> Result<Document, Error> {
     let (meta, body) = split_frontmatter(markdown)?;
+    let (elements, has_alerts) = to_elements(body);
     Ok(Document {
         meta,
-        elements: to_elements(body),
+        elements,
+        has_alerts,
     })
 }
 
@@ -306,7 +316,7 @@ fn is_typst_ident(value: &str) -> bool {
     first.is_some_and(|first| first == '_' || first.is_alphabetic()) && rest_valid && !is_keyword
 }
 
-fn to_elements(markdown: &str) -> Vec<Element> {
+fn to_elements(markdown: &str) -> (Vec<Element>, bool) {
     let mut emitter = Emitter::new(extract_tables(markdown));
     for event in Parser::new_ext(markdown, Options::all()) {
         emitter.event(event);
@@ -322,6 +332,8 @@ struct Emitter {
     code_block: Option<CodeBlock>,
     link_stack: Vec<bool>,
     image: Option<ImageState>,
+    has_alerts: bool,
+    blockquote_depth: usize,
     table: Option<Table>,
     cell: Option<String>,
 }
@@ -346,6 +358,7 @@ struct Table {
     header: Vec<Vec<String>>,
     rows: Vec<Vec<String>>,
     row: Vec<String>,
+    inline: bool,
 }
 
 impl Emitter {
@@ -358,6 +371,8 @@ impl Emitter {
             code_block: None,
             link_stack: Vec::new(),
             image: None,
+            has_alerts: false,
+            blockquote_depth: 0,
             table: None,
             cell: None,
         }
@@ -494,7 +509,17 @@ impl Emitter {
                 self.write("\"");
                 self.image = Some(ImageState { alt: String::new() });
             }
-            Tag::BlockQuote(_) => self.write("\n#quote(block: true)[\n"),
+            Tag::BlockQuote(Some(kind)) => {
+                self.has_alerts = true;
+                self.blockquote_depth += 1;
+                self.write("\n#_tome_md_github_alert(\"");
+                self.write(alert_kind_name(kind));
+                self.write("\")[\n");
+            }
+            Tag::BlockQuote(None) => {
+                self.blockquote_depth += 1;
+                self.write("\n#quote(block: true)[\n");
+            }
             Tag::CodeBlock(kind) => {
                 let lang = match kind {
                     CodeBlockKind::Fenced(lang) => lang.to_string(),
@@ -525,12 +550,16 @@ impl Emitter {
                 self.write(if ordered { "+ " } else { "- " });
             }
             Tag::Table(alignments) => {
-                self.flush_content();
+                let inline = self.blockquote_depth > 0;
+                if !inline {
+                    self.flush_content();
+                }
                 self.table = Some(Table {
                     alignments,
                     header: Vec::new(),
                     rows: Vec::new(),
                     row: Vec::new(),
+                    inline,
                 });
             }
             Tag::TableHead => {
@@ -561,7 +590,10 @@ impl Emitter {
             | TagEnd::Subscript => self.write("]"),
             TagEnd::Link if self.link_stack.pop().unwrap_or(false) => self.write("]"),
             TagEnd::Link => {}
-            TagEnd::BlockQuote(_) => self.write("\n]\n\n"),
+            TagEnd::BlockQuote(_) => {
+                self.blockquote_depth = self.blockquote_depth.saturating_sub(1);
+                self.write("\n]\n\n");
+            }
             TagEnd::CodeBlock => {
                 if let Some(code) = self.code_block.take() {
                     let fence = code_fence(&code.text);
@@ -659,15 +691,28 @@ impl Emitter {
             .tables
             .next()
             .unwrap_or(MarkdownTable { rows: Vec::new() });
+        if table.inline {
+            return;
+        }
         self.elements.push(Element::Table {
             content: std::mem::take(&mut self.out),
             data,
         });
     }
 
-    fn finish(mut self) -> Vec<Element> {
+    fn finish(mut self) -> (Vec<Element>, bool) {
         self.flush_content();
-        self.elements
+        (self.elements, self.has_alerts)
+    }
+}
+
+fn alert_kind_name(kind: BlockQuoteKind) -> &'static str {
+    match kind {
+        BlockQuoteKind::Note => "note",
+        BlockQuoteKind::Tip => "tip",
+        BlockQuoteKind::Important => "important",
+        BlockQuoteKind::Warning => "warning",
+        BlockQuoteKind::Caution => "caution",
     }
 }
 
@@ -848,6 +893,59 @@ mod tests {
             "body: {}",
             doc.body()
         );
+    }
+
+    #[test]
+    fn github_alerts_use_the_alert_helper() {
+        for (marker, kind) in [
+            ("NOTE", "note"),
+            ("TIP", "tip"),
+            ("IMPORTANT", "important"),
+            ("WARNING", "warning"),
+            ("CAUTION", "caution"),
+        ] {
+            let doc = parse_ok(&format!("> [!{marker}]\n> Body"));
+            assert!(doc.has_alerts(), "{marker}");
+            assert!(
+                doc.body()
+                    .contains(&format!("#_tome_md_github_alert(\"{kind}\")[")),
+                "{}",
+                doc.body()
+            );
+        }
+    }
+
+    #[test]
+    fn lowercase_github_alerts_are_recognized() {
+        let doc = parse_ok("> [!note]\n> Body");
+        assert!(doc.has_alerts());
+        assert!(doc.body().contains("#_tome_md_github_alert(\"note\")["));
+    }
+
+    #[test]
+    fn ordinary_blockquotes_are_unchanged() {
+        let doc = parse_ok("> A normal quote");
+        assert!(!doc.has_alerts());
+        assert!(doc.body().contains("#quote(block: true)["));
+    }
+
+    #[test]
+    fn malformed_alerts_are_normal_quotes() {
+        let doc = parse_ok("> [!BOGUS]\n> Body");
+        assert!(!doc.has_alerts());
+        assert!(doc.body().contains("#quote(block: true)["));
+    }
+
+    #[test]
+    fn alerts_can_contain_lists_and_tables() {
+        let doc = parse_ok(
+            "> [!WARNING]\n> Intro\n>\n> - one\n> - two\n>\n> | A | B |\n> | --- | --- |\n> | 1 | 2 |",
+        );
+        assert!(doc.has_alerts());
+        assert!(doc.body().contains("#_tome_md_github_alert(\"warning\")["));
+        assert!(doc.body().contains("- one"));
+        assert!(doc.body().contains("#table("));
+        assert!(doc.body().contains("]"), "{}", doc.body());
     }
 
     #[test]
