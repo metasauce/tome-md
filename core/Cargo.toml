@@ -1,0 +1,22 @@
+[package]
+name = "tome-md-core"
+version.workspace = true
+edition.workspace = true
+description = "Markdown to PDF through Typst (library)"
+license.workspace = true
+
+[lib]
+name = "tome_md_core"
+
+[dependencies]
+fontdb = "0.23"
+pulldown-cmark = "0.13.6"
+thiserror = "2"
+tracing = "0.1"
+typst = "0.15.1"
+typst-layout = "0.15.1"
+typst-pdf = "0.15.1"
+typst-kit = { version = "0.15.1", features = ["scan-fonts"] }
+
+[lints]
+workspace = true
