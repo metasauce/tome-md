@@ -23,6 +23,15 @@ cargo install --path cli
 This installs `tome` into `~/.cargo/bin`. To build without installing, run
 `cargo build -p tome-md --release` and use `target/release/tome`.
 
+For a smaller binary, use the size-oriented profile. It takes longer to link:
+
+```sh
+cargo install --path cli --profile small
+# or, without installing:
+cargo build -p tome-md --profile small
+# -> target/small/tome
+```
+
 ## Usage
 
 ```sh

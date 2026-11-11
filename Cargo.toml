@@ -14,6 +14,18 @@ opt-level = 3
 panic = "abort"
 strip = true
 
+# Size-oriented build. Measured on x86_64: ~35.6 MB versus ~47.8 MB for
+# `release`, at the cost of a slower link (~3.5 min versus ~1.7 min). Fat LTO
+# with one codegen unit was the best size/time trade-off; thin LTO linked
+# faster but produced a binary about 6 MB larger.
+#
+#     cargo build --profile small -p tome-md
+[profile.small]
+inherits = "release"
+opt-level = "z"
+lto = "fat"
+codegen-units = 1
+
 [workspace.lints.clippy]
 # Don't Panic - prevent panics from unwraps and unsafe slicing or indexing
 string_slice = "warn"

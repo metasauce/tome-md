@@ -68,7 +68,12 @@ reported by clap as usage errors (exit 2).
   for a 49-page one.
 - `cargo build -p tome-md --release` uses `opt-level = 3` without LTO, so
   linking is much faster than a size-oriented LTO build while still producing a
-  fast binary.
+  fast binary. It is the default for `cargo install` and for iteration.
+- `cargo build -p tome-md --profile small` is the size-oriented build
+  (`opt-level = "z"`, fat LTO, one codegen unit). On x86_64 it took ~3.5 min
+  and produced a ~35.6 MB binary, compared with ~1.7 min and ~47.8 MB for
+  `release`. Use `target/small/tome`. The `z` opt level trades some render
+  speed for size; use `release` when iterating on layout or timing.
 
 ## Markdown formatting
 
