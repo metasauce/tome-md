@@ -7,7 +7,7 @@ use clap::Parser;
 use tracing::{debug, info};
 use tracing_subscriber::EnvFilter;
 
-use tome_md_core::{Error, Template, TemplateOptions, render};
+use tome_md_core::{Error, Template, TemplateOptions, render, render_pdf};
 
 /// Compile Markdown to PDF through Typst.
 #[derive(Parser)]
@@ -106,14 +106,31 @@ fn run(cli: Cli) -> Result<()> {
         "loaded template"
     );
 
-    let rendered = render(&markdown, &template)
-        .with_context(|| format!("could not render `{}`", cli.input.display()))?;
-    info!(
-        elapsed_ms = started.elapsed().as_millis(),
-        typst_bytes = rendered.typst.len(),
-        pdf_bytes = rendered.pdf.len(),
-        "rendered PDF"
-    );
+    let (typst, pdf) = match &typst_path {
+        // The Typst source is only kept when it is written out.
+        Some(_) => {
+            let rendered = render(&markdown, &template)
+                .with_context(|| format!("could not render `{}`", cli.input.display()))?;
+            (Some(rendered.typst), rendered.pdf)
+        }
+        None => {
+            let pdf = render_pdf(&markdown, &template)
+                .with_context(|| format!("could not render `{}`", cli.input.display()))?;
+            (None, pdf)
+        }
+    };
+
+    let elapsed_ms = started.elapsed().as_millis();
+    if let Some(typst) = &typst {
+        info!(
+            elapsed_ms,
+            typst_bytes = typst.len(),
+            pdf_bytes = pdf.len(),
+            "rendered PDF"
+        );
+    } else {
+        info!(elapsed_ms, pdf_bytes = pdf.len(), "rendered PDF");
+    }
 
     if let Some(parent) = output.parent()
         && !parent.as_os_str().is_empty()
@@ -122,18 +139,17 @@ fn run(cli: Cli) -> Result<()> {
             .with_context(|| format!("could not create directory `{}`", parent.display()))?;
     }
 
-    if let Some(typst_path) = &typst_path {
-        fs::write(typst_path, &rendered.typst)
+    if let (Some(typst_path), Some(typst)) = (&typst_path, &typst) {
+        fs::write(typst_path, typst)
             .with_context(|| format!("could not write `{}`", typst_path.display()))?;
         info!(path = %typst_path.display(), "wrote Typst source");
     }
 
-    fs::write(&output, &rendered.pdf)
-        .with_context(|| format!("could not write `{}`", output.display()))?;
+    fs::write(&output, &pdf).with_context(|| format!("could not write `{}`", output.display()))?;
 
     info!(
         path = %output.display(),
-        bytes = rendered.pdf.len(),
+        bytes = pdf.len(),
         "wrote PDF"
     );
     Ok(())

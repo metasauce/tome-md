@@ -12,7 +12,8 @@ std::fs::write("notes.pdf", rendered.pdf)?;
 ```
 
 `render` returns `Rendered { typst, pdf }`: the generated Typst source and the
-PDF bytes.
+PDF bytes. When the source is not needed, `render_pdf` returns the PDF bytes
+alone and skips keeping the generated Typst source.
 
 `TemplateOptions::default()` loads only the template's own fonts. Build a
 template from an embedded string with `Template::from_source` when there is no
