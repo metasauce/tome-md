@@ -5,7 +5,8 @@ with all GFM options enabled. The emitter lives in `core/src/markdown.rs`.
 
 Supported:
 
-- headings, paragraphs, emphasis, strong, strikethrough, super- and subscript
+- headings, paragraphs, emphasis, strong, strikethrough
+- superscript and subscript via inline `<sup>` / `<sub>` tags
 - inline code and fenced code blocks (the language hint is kept on the fence)
 - ordered lists (including start numbers), unordered lists, nesting, task markers
 - block quotes, tables with header rows and column alignment
@@ -14,7 +15,7 @@ Supported:
 Partially supported or not rendered:
 
 - **images** — alt text is rendered as emphasis; the image itself is not fetched
-- **raw HTML** — dropped
+- **raw HTML** — dropped, except inline `<sup>` / `<sub>`
 - **math** — dropped
 - **footnotes** — not emitted as footnotes
 

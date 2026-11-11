@@ -426,8 +426,16 @@ impl Emitter {
                 self.write("\n#line(length: 100%, stroke: 0.75pt + luma(185))\n\n");
             }
             Event::TaskListMarker(done) => self.write(if done { "☑ " } else { "☐ " }),
-            // Raw HTML and math are not rendered by this small pipeline.
-            Event::Html(_) | Event::InlineHtml(_) => {}
+            // Inline superscript/subscript tags are supported; other raw
+            // HTML and math are not rendered by this small pipeline.
+            Event::InlineHtml(html) => match html.as_ref() {
+                "<sup>" => self.write("#super["),
+                "</sup>" => self.write("]"),
+                "<sub>" => self.write("#sub["),
+                "</sub>" => self.write("]"),
+                _ => {}
+            },
+            Event::Html(_) => {}
             _ => {}
         }
     }
@@ -812,6 +820,13 @@ mod tests {
             "body: {}",
             doc.body()
         );
+    }
+
+    #[test]
+    fn inline_sup_and_sub_tags() {
+        let doc = parse_ok("H<sub>2</sub>O and 15<sup>th</sup>");
+        assert!(doc.body().contains("#sub[2]"), "body: {}", doc.body());
+        assert!(doc.body().contains("#super[th]"), "body: {}", doc.body());
     }
 
     #[test]
