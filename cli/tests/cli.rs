@@ -8,7 +8,7 @@ fn bin() -> PathBuf {
 }
 
 const SAMPLE: &str = "---\ntitle: Sample\n---\n\n# Heading\n\nHello, **world**.\n";
-const TEMPLATE: &str = "#let template(title, body) = {\n  heading(level: 1)[#title]\n  body\n}\n";
+const TEMPLATE: &str = "#let template(title, body) = {\n  heading(level: 1)[#title]\n  for element in body { element.content }\n}\n";
 
 fn write_sample(path: &Path) {
     fs::write(path, SAMPLE).expect("write sample");
@@ -226,7 +226,7 @@ fn plain_template_value_is_a_real_path() {
     let template_path = dir.join("plain");
     fs::write(
         &template_path,
-        "#let template(title: none, body) = {\n  [LOCAL TEMPLATE]\n  body\n}\n",
+        "#let template(title: none, body) = {\n  [LOCAL TEMPLATE]\n  for element in body { element.content }\n}\n",
     )
     .expect("write template");
     fs::write(&input, "---\ntitle: T\n---\n\nHello\n").expect("write input");

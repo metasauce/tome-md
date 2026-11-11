@@ -2,18 +2,106 @@
 
 use pulldown_cmark::{Alignment, CodeBlockKind, Event, Options, Parser, Tag, TagEnd};
 
-/// A parsed document: front-matter values plus the Typst body.
+/// A parsed document: front-matter values and the rendered element list.
 pub struct Document {
     pub meta: std::collections::BTreeMap<String, String>,
-    pub body: String,
+    pub elements: Vec<Element>,
 }
 
-/// Parse Markdown (optional `key: value` front matter) and emit Typst.
+/// One element of the rendered Markdown, in document order.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Element {
+    /// A run of non-table Typst content.
+    Content(String),
+    /// A rendered table and its plain-text data.
+    Table {
+        content: String,
+        data: MarkdownTable,
+    },
+}
+
+/// One Markdown table with plain-text cells. `rows[0]` is the header row.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MarkdownTable {
+    pub rows: Vec<Vec<String>>,
+}
+
+impl Document {
+    /// Concatenated Typst source of all elements.
+    pub fn body(&self) -> String {
+        let mut out = String::new();
+        for element in &self.elements {
+            match element {
+                Element::Content(content) => out.push_str(content),
+                Element::Table { content, .. } => out.push_str(content),
+            }
+        }
+        out
+    }
+
+    /// Plain-text tables in document order.
+    pub fn tables(&self) -> impl Iterator<Item = &MarkdownTable> {
+        self.elements.iter().filter_map(|element| match element {
+            Element::Table { data, .. } => Some(data),
+            Element::Content(_) => None,
+        })
+    }
+}
+
+/// Parse Markdown (optional `key: value` front matter) and emit elements.
 pub fn parse(markdown: &str) -> Document {
     let (meta, body) = split_frontmatter(markdown);
     Document {
         meta,
-        body: to_typst(body),
+        elements: to_elements(body),
+    }
+}
+
+/// Extract the Markdown tables as plain-text data. The first row is the header.
+pub fn extract_tables(markdown: &str) -> Vec<MarkdownTable> {
+    let mut tables = Vec::new();
+    let mut table: Option<MarkdownTable> = None;
+    let mut row: Vec<String> = Vec::new();
+    let mut cell: Option<String> = None;
+
+    for event in Parser::new_ext(markdown, Options::all()) {
+        match event {
+            Event::Start(Tag::Table(_)) => {
+                table = Some(MarkdownTable { rows: Vec::new() });
+            }
+            Event::Start(Tag::TableHead | Tag::TableRow) => row.clear(),
+            Event::Start(Tag::TableCell) => cell = Some(String::new()),
+            Event::Text(text) => push_cell(&mut cell, &text),
+            Event::Code(code) => push_cell(&mut cell, &code.replace('\n', " ")),
+            Event::SoftBreak | Event::HardBreak => push_cell(&mut cell, " "),
+            Event::TaskListMarker(done) => {
+                push_cell(&mut cell, if done { "☑ " } else { "☐ " });
+            }
+            Event::End(TagEnd::TableCell) => {
+                if let Some(text) = cell.take() {
+                    row.push(normalize_cell(&text));
+                }
+            }
+            Event::End(TagEnd::TableHead | TagEnd::TableRow) => {
+                if let Some(table) = &mut table {
+                    table.rows.push(std::mem::take(&mut row));
+                }
+            }
+            Event::End(TagEnd::Table) => {
+                if let Some(table) = table.take() {
+                    tables.push(table);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    tables
+}
+
+fn push_cell(cell: &mut Option<String>, text: &str) {
+    if let Some(cell) = cell {
+        cell.push_str(text);
     }
 }
 
@@ -53,17 +141,18 @@ fn split_frontmatter(input: &str) -> (std::collections::BTreeMap<String, String>
     }
 }
 
-fn to_typst(markdown: &str) -> String {
-    let mut emitter = Emitter::default();
+fn to_elements(markdown: &str) -> Vec<Element> {
+    let mut emitter = Emitter::new(extract_tables(markdown));
     for event in Parser::new_ext(markdown, Options::all()) {
         emitter.event(event);
     }
     emitter.finish()
 }
 
-#[derive(Default)]
 struct Emitter {
     out: String,
+    elements: Vec<Element>,
+    tables: std::vec::IntoIter<MarkdownTable>,
     list_stack: Vec<ListState>,
     code_block: Option<CodeBlock>,
     link_stack: Vec<bool>,
@@ -90,6 +179,26 @@ struct Table {
 }
 
 impl Emitter {
+    fn new(tables: Vec<MarkdownTable>) -> Self {
+        Self {
+            out: String::new(),
+            elements: Vec::new(),
+            tables: tables.into_iter(),
+            list_stack: Vec::new(),
+            code_block: None,
+            link_stack: Vec::new(),
+            table: None,
+            cell: None,
+        }
+    }
+
+    fn flush_content(&mut self) {
+        if !self.out.is_empty() {
+            self.elements
+                .push(Element::Content(std::mem::take(&mut self.out)));
+        }
+    }
+
     fn target(&mut self) -> &mut String {
         self.cell.as_mut().unwrap_or(&mut self.out)
     }
@@ -214,6 +323,7 @@ impl Emitter {
                 self.write(if ordered { "+ " } else { "- " });
             }
             Tag::Table(alignments) => {
+                self.flush_content();
                 self.table = Some(Table {
                     alignments,
                     header: Vec::new(),
@@ -343,14 +453,20 @@ impl Emitter {
         }
 
         self.write(")\n\n");
+
+        let data = self
+            .tables
+            .next()
+            .unwrap_or(MarkdownTable { rows: Vec::new() });
+        self.elements.push(Element::Table {
+            content: std::mem::take(&mut self.out),
+            data,
+        });
     }
 
-    fn finish(mut self) -> String {
-        if self.out.starts_with('\n') {
-            self.out.remove(0);
-        }
-        self.out.push('\n');
-        self.out
+    fn finish(mut self) -> Vec<Element> {
+        self.flush_content();
+        self.elements
     }
 }
 
@@ -364,6 +480,11 @@ pub(crate) fn escape_typst(text: &str) -> String {
         out.push(if ch == '\n' { ' ' } else { ch });
     }
     out
+}
+
+/// Collapse runs of whitespace in a plain-text table cell.
+fn normalize_cell(text: &str) -> String {
+    text.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
 fn is_typst_special(ch: char) -> bool {
@@ -401,32 +522,32 @@ mod tests {
             parse("---\ntitle: Hello\ndate: 2026-01-02\n---\n\n# Hi\n\nSome *text* and `code`.\n");
         assert_eq!(doc.meta.get("title").map(String::as_str), Some("Hello"));
         assert_eq!(doc.meta.get("date").map(String::as_str), Some("2026-01-02"));
-        assert!(doc.body.contains("= Hi"));
-        assert!(doc.body.contains("#emph[text]"));
-        assert!(doc.body.contains("`code`"));
+        assert!(doc.body().contains("= Hi"));
+        assert!(doc.body().contains("#emph[text]"));
+        assert!(doc.body().contains("`code`"));
     }
 
     #[test]
     fn table() {
         let doc = parse("| A | B |\n| :- | -: |\n| 1 | 2 |\n");
-        assert!(doc.body.contains("#table("));
-        assert!(doc.body.contains("table.header"));
-        assert!(doc.body.contains("align: (left, right)"));
+        assert!(doc.body().contains("#table("));
+        assert!(doc.body().contains("table.header"));
+        assert!(doc.body().contains("align: (left, right)"));
     }
 
     #[test]
     fn escapes_a_leading_slash() {
         let doc = parse("/ hello");
-        assert!(doc.body.contains("\\/ hello"), "body: {}", doc.body);
+        assert!(doc.body().contains("\\/ hello"), "body: {}", doc.body());
     }
 
     #[test]
     fn code_block_uses_a_fence_longer_than_its_content() {
         let doc = parse("````\n```\ninside\n```\n````\n");
         assert!(
-            doc.body.contains("````\n```\ninside\n```\n````"),
+            doc.body().contains("````\n```\ninside\n```\n````"),
             "body: {}",
-            doc.body
+            doc.body()
         );
     }
 
@@ -434,23 +555,57 @@ mod tests {
     fn preserves_an_ordered_list_start() {
         let doc = parse("3. third\n4. fourth\n");
         assert!(
-            doc.body.contains("#set enum(start: 3)"),
+            doc.body().contains("#set enum(start: 3)"),
             "body: {}",
-            doc.body
+            doc.body()
         );
     }
 
     #[test]
     fn empty_link_destination_is_rendered_as_text() {
         let doc = parse("[x]()");
-        assert!(!doc.body.contains("#link(\"\")"), "body: {}", doc.body);
-        assert!(doc.body.contains('x'), "body: {}", doc.body);
+        assert!(!doc.body().contains("#link(\"\")"), "body: {}", doc.body());
+        assert!(doc.body().contains('x'), "body: {}", doc.body());
     }
 
     #[test]
     fn strips_a_bom_before_front_matter() {
         let doc = parse("\u{feff}---\ntitle: BOM\n---\n\nHello");
         assert_eq!(doc.meta.get("title").map(String::as_str), Some("BOM"));
-        assert!(!doc.body.contains("title: BOM"), "body: {}", doc.body);
+        assert!(!doc.body().contains("title: BOM"), "body: {}", doc.body());
+    }
+
+    #[test]
+    fn collects_tables_as_plain_text() {
+        let doc = parse(
+            "| Std. | Tätigkeit |\n| ---: | --- |\n| 4,0 | **Setup** [PR](https://example.com) |\n",
+        );
+        let tables = doc.tables().collect::<Vec<_>>();
+        assert_eq!(tables.len(), 1);
+        assert_eq!(tables[0].rows[0], vec!["Std.", "Tätigkeit"]);
+        assert_eq!(tables[0].rows[1], vec!["4,0", "Setup PR"]);
+    }
+
+    #[test]
+    fn collects_multiple_tables() {
+        let doc = parse("| A |\n| --- |\n| 1 |\n\n| B |\n| --- |\n| 2 |\n");
+        let tables = doc.tables().collect::<Vec<_>>();
+        assert_eq!(tables.len(), 2);
+        assert_eq!(tables[0].rows[1], vec!["1"]);
+        assert_eq!(tables[1].rows[1], vec!["2"]);
+    }
+
+    #[test]
+    fn elements_keep_tables_in_document_order() {
+        let doc = parse("Hello\n\n| A |\n| --- |\n| 1 |\n\nWorld\n");
+        let kinds = doc
+            .elements
+            .iter()
+            .map(|element| match element {
+                Element::Content(_) => "content",
+                Element::Table { .. } => "table",
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(kinds, ["content", "table", "content"]);
     }
 }

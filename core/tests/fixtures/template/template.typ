@@ -2,5 +2,7 @@
 // directory, so files next to this entry point are served to Typst on demand.
 #let template(title, subtitle: none, body) = {
   heading(level: 1)[#title]
-  body
+  for element in body {
+    element.content
+  }
 }
