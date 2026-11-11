@@ -27,7 +27,27 @@ pub struct Rendered {
 }
 
 /// Render Markdown with a loaded template.
+///
+/// Use [`render_pdf`] when the generated Typst source is not needed; that path
+/// skips copying it out of the Typst world.
 pub fn render(markdown: &str, template: &Template) -> Result<Rendered, Error> {
+    let (world, pdf) = render_world(markdown, template)?;
+    Ok(Rendered {
+        typst: world.source_text().to_owned(),
+        pdf,
+    })
+}
+
+/// Render Markdown to PDF bytes with a loaded template, without keeping the
+/// generated Typst source.
+pub fn render_pdf(markdown: &str, template: &Template) -> Result<Vec<u8>, Error> {
+    let (_world, pdf) = render_world(markdown, template)?;
+    Ok(pdf)
+}
+
+/// The shared pipeline. Returns the Typst world so callers can decide whether
+/// to copy the generated source out before dropping it.
+fn render_world(markdown: &str, template: &Template) -> Result<(PdfWorld, Vec<u8>), Error> {
     let doc = markdown::parse(markdown);
     debug!(
         markdown_bytes = markdown.len(),
@@ -64,8 +84,7 @@ pub fn render(markdown: &str, template: &Template) -> Result<Rendered, Error> {
     })?;
     debug!(elapsed_ms = started.elapsed().as_millis(), "exported PDF");
 
-    let typst = world.source_text().to_owned();
-    Ok(Rendered { typst, pdf })
+    Ok((world, pdf))
 }
 
 fn format_errors(world: &PdfWorld, errors: &[typst::diag::SourceDiagnostic]) -> String {
@@ -109,5 +128,22 @@ mod tests {
         let error = render("Hello", &template).expect_err("expected a compile error");
         let message = error.to_string();
         assert!(message.contains("main.typ:"), "{message}");
+    }
+
+    #[test]
+    fn render_pdf_matches_render() {
+        let template = Template::from_source(
+            "#let template(title: none, body) = { body }",
+            "test.typ",
+            TemplateOptions::default(),
+        )
+        .expect("build template");
+        let markdown = "# Title\n\nHello, world.";
+
+        let rendered = render(markdown, &template).expect("render");
+        let pdf = render_pdf(markdown, &template).expect("render_pdf");
+
+        assert!(!rendered.typst.is_empty());
+        assert_eq!(rendered.pdf, pdf);
     }
 }
