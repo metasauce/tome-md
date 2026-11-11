@@ -6,7 +6,7 @@ description = "Compile Markdown to PDF through Typst"
 license.workspace = true
 
 [[bin]]
-name = "tome-md"
+name = "tome"
 path = "src/main.rs"
 
 [dependencies]
