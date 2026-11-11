@@ -7,7 +7,7 @@
 
 #let template(title: none, subtitle: none, body) = {
   set page(paper: "a4", margin: 20mm, numbering: "1")
-  set text(font: sans, size: 11pt, fill: luma(28))
+  set text(font: sans, size: 11pt)
   set par(leading: 0.65em, spacing: 1.1em)
 
   show heading: set text(weight: 700)
@@ -57,5 +57,7 @@
     #v(1.4em)
   ]
 
-  body
+  for element in body {
+    element.content
+  }
 }

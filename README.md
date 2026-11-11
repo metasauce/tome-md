@@ -48,23 +48,32 @@ render error, `2` usage error.
 
 A template decides what the PDF looks like. `tome` uses
 [Typst](https://typst.app) for layout, so any `.typ` file can be a template as
-long as it defines a `template` function. The minimal one takes just the body:
+long as it defines a `template` function. The minimal one takes the document
+body as a list of elements:
 
 ```typst
 #let template(body) = {
   // page setup, styling, cover page…
-  body
+  for element in body {
+    element.content
+  }
 }
 ```
 
-`body` receives the converted Markdown. To pull values from the front matter at
-the top of your Markdown file, add parameters to the signature:
+Each element has `content` (the Typst markup) and `data` (`none`, or the rows
+of a table). To pull values from the front matter at the top of your Markdown
+file, add parameters to the signature:
 
 ```typst
 #let template(without_default, with_default: none, body) = {
   // …
-  my_kwarg
-  body
+  without_default
+  if with_default != none {
+    with_default
+  }
+  for element in body {
+    element.content
+  }
 }
 ```
 
@@ -77,7 +86,8 @@ with_default: Im not required
 # Content
 ```
 
-A parameter with a default can be left out while one without a default is required.
+A parameter with a default can be left out while one without a default is
+required.
 
 Other files in the folder, like fonts and images, are available to the template
 as if they sat next to it. That keeps a template self-contained, so you can copy

@@ -118,7 +118,9 @@ mod tests {
     #[test]
     fn compile_errors_include_a_source_location() {
         let template = Template::from_source(
-            r#"#let template(title: none, body) = { body }
+            r#"#let template(title: none, body) = {
+  for element in body { element.content }
+}
 #panic("boom")"#,
             "test.typ",
             TemplateOptions::default(),
@@ -133,7 +135,7 @@ mod tests {
     #[test]
     fn render_pdf_matches_render() {
         let template = Template::from_source(
-            "#let template(title: none, body) = { body }",
+            "#let template(title: none, body) = { for element in body { element.content } }",
             "test.typ",
             TemplateOptions::default(),
         )

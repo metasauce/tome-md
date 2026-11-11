@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use tracing::debug;
 
 use crate::error::Error;
-use crate::markdown::{Document, escape_typst};
+use crate::markdown::{Document, Element, MarkdownTable, escape_typst};
 
 use super::entry::{ParamKind, TemplateEntry, TemplateParam};
 
@@ -120,18 +120,13 @@ impl Template {
             args = format!("  {args},\n");
         }
 
-        Ok(format!(
-            "{}\n#show: body => template(\n{})\n{}",
-            self.entry.source(),
-            args,
-            doc.body,
-        ))
+        Ok(format!("{}\n#template(\n{})\n", self.entry.source(), args))
     }
 }
 
 fn template_argument(param: &TemplateParam, doc: &Document) -> Option<String> {
     match param.kind {
-        ParamKind::Positional if param.name == "body" => Some("body".to_owned()),
+        ParamKind::Positional if param.name == "body" => Some(elements_literal(&doc.elements)),
         ParamKind::Positional => {
             let value = doc.meta.get(&param.name)?;
             Some(format!("[{}]", escape_typst(value)))
@@ -141,6 +136,59 @@ fn template_argument(param: &TemplateParam, doc: &Document) -> Option<String> {
             .get(&param.name)
             .map(|value| format!("{}: [{}]", param.name, escape_typst(value))),
     }
+}
+
+/// Encode the element list as Typst dictionaries with content and optional data.
+fn elements_literal(elements: &[Element]) -> String {
+    let mut out = String::from("(");
+    for element in elements {
+        match element {
+            Element::Content(content) => {
+                out.push_str("(content: [");
+                out.push_str(content);
+                out.push_str("], data: none),");
+            }
+            Element::Table { content, data } => {
+                out.push_str("(content: [");
+                out.push_str(content);
+                out.push_str("], data: ");
+                out.push_str(&table_literal(data));
+                out.push_str("),");
+            }
+        }
+    }
+    out.push(')');
+    out
+}
+
+/// Encode one table as a Typst array of rows and string cells.
+fn table_literal(table: &MarkdownTable) -> String {
+    let mut out = String::from("(");
+    for row in &table.rows {
+        out.push('(');
+        for cell in row {
+            out.push_str(&typst_string(cell));
+            out.push(',');
+        }
+        out.push_str("),");
+    }
+    out.push(')');
+    out
+}
+
+fn typst_string(value: &str) -> String {
+    let mut out = String::with_capacity(value.len() + 2);
+    out.push('"');
+    for ch in value.chars() {
+        match ch {
+            '\\' => out.push_str("\\\\"),
+            '"' => out.push_str("\\\""),
+            '\n' | '\r' => out.push(' '),
+            _ => out.push(ch),
+        }
+    }
+    out.push('"');
+    out
 }
 
 #[cfg(test)]
@@ -172,7 +220,7 @@ mod tests {
     #[test]
     fn builds_from_embedded_source() {
         let template = Template::from_source(
-            "#let template(title: none, body) = { body }",
+            "#let template(title: none, body) = { for element in body { element.content } }",
             "embedded.typ",
             TemplateOptions::default(),
         )
@@ -217,6 +265,41 @@ mod tests {
         let typst = template.build(&doc).expect("build document");
         assert!(typst.contains("[T]"));
         assert!(!typst.contains("subtitle: ["));
-        assert!(typst.contains("body,"));
+        assert!(typst.contains("(content:"), "{typst}");
+    }
+
+    #[test]
+    fn tables_are_inside_the_element_list() {
+        let source = "#let template(body) = { body }";
+        let template = Template::from_source(source, "test.typ", TemplateOptions::default())
+            .expect("build template");
+        let doc = markdown::parse("| Std. | Tätigkeit |\n| ---: | --- |\n| 4,0 | Setup |");
+        let typst = template.build(&doc).expect("build document");
+        assert!(
+            typst.contains(r#"data: (("Std.","Tätigkeit",),("4,0","Setup",),)"#),
+            "{typst}"
+        );
+    }
+
+    #[test]
+    fn body_is_not_required_from_front_matter() {
+        let source = "#let template(body) = { body }";
+        let template = Template::from_source(source, "test.typ", TemplateOptions::default())
+            .expect("build template");
+        let doc = markdown::parse("| A |\n| --- |\n| 1 |");
+        let typst = template
+            .build(&doc)
+            .expect("body is supplied by the parser");
+        assert!(typst.contains("(content:"), "{typst}");
+    }
+
+    #[test]
+    fn elements_without_tables_have_no_data() {
+        let source = "#let template(body) = { body }";
+        let template = Template::from_source(source, "test.typ", TemplateOptions::default())
+            .expect("build template");
+        let doc = markdown::parse("No table here");
+        let typst = template.build(&doc).expect("build document");
+        assert!(typst.contains("data: none"), "{typst}");
     }
 }
