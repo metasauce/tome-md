@@ -10,6 +10,7 @@ Supported:
 - inline code and fenced code blocks (the language hint is kept on the fence)
 - ordered lists (including start numbers), unordered lists, nesting, task markers
 - block quotes, tables with header rows and column alignment
+- GitHub alert blockquotes (`> [!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNING]`, `[!CAUTION]`)
 - images with local paths; the Markdown alt text is kept as the image alt
 - links, horizontal rules, hard breaks
 

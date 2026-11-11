@@ -137,6 +137,35 @@ mod tests {
     }
 
     #[test]
+    fn github_alert_renders() {
+        let template = Template::from_source(
+            "#let template(body) = { for element in body { element.content } }",
+            "test.typ",
+            TemplateOptions::default(),
+        )
+        .expect("build template");
+
+        let rendered = render("> [!NOTE]\n> Body", &template).expect("render alert");
+        assert!(!rendered.pdf.is_empty());
+        assert!(rendered.typst.contains("_tome_md_github_alert"));
+    }
+
+    #[test]
+    fn github_alert_with_table_renders() {
+        let template = Template::from_source(
+            "#let template(body) = { for element in body { element.content } }",
+            "test.typ",
+            TemplateOptions::default(),
+        )
+        .expect("build template");
+
+        let markdown = "> [!NOTE]\n> Intro\n>\n> | A | B |\n> | --- | --- |\n> | 1 | 2 |";
+        let rendered = render(markdown, &template).expect("render alert with table");
+        assert!(!rendered.pdf.is_empty());
+        assert!(rendered.typst.contains("#table("), "{}", rendered.typst);
+    }
+
+    #[test]
     fn render_pdf_matches_render() {
         let template = Template::from_source(
             "#let template(title: none, body) = { for element in body { element.content } }",

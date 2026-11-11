@@ -7,6 +7,38 @@ use crate::markdown::{Document, Element, MarkdownTable};
 
 use super::entry::{ParamKind, TemplateEntry, TemplateParam};
 
+/// Self-contained Typst helper injected only for documents with GitHub alerts.
+/// Templates receive the default GitHub-style block and can override the
+/// helper if they need a different look.
+const GITHUB_ALERT_HELPER: &str = r##"#let _tome_md_github_alert(kind, body) = {
+  let styles = (
+    note: (label: "Note", color: rgb("#0969da"), fill: rgb("#ddf4ff")),
+    tip: (label: "Tip", color: rgb("#1a7f37"), fill: rgb("#dafbe1")),
+    important: (
+      label: "Important",
+      color: rgb("#8250df"),
+      fill: rgb("#fbefff"),
+    ),
+    warning: (label: "Warning", color: rgb("#9a6700"), fill: rgb("#fff8c5")),
+    caution: (label: "Caution", color: rgb("#cf222e"), fill: rgb("#ffebe9")),
+  )
+  let style = styles.at(kind)
+  block(
+    width: 100%,
+    breakable: false,
+    fill: style.fill,
+    stroke: (left: 4pt + style.color),
+    inset: (x: 12pt, y: 8pt),
+    radius: 2pt,
+  )[
+    #text(weight: "bold", fill: style.color)[#style.label]
+    #v(0.35em)
+    #body
+  ]
+}
+
+"##;
+
 /// Options used when rendering a template.
 ///
 /// Self-contained by default: template fonts plus Typst's embedded base fonts.
@@ -120,7 +152,17 @@ impl Template {
             args = format!("  {args},\n");
         }
 
-        Ok(format!("{}\n#template(\n{})\n", self.entry.source(), args))
+        let helper = if doc.has_alerts() {
+            GITHUB_ALERT_HELPER
+        } else {
+            ""
+        };
+
+        Ok(format!(
+            "{helper}{}\n#template(\n{})\n",
+            self.entry.source(),
+            args
+        ))
     }
 }
 
@@ -270,6 +312,25 @@ mod tests {
         assert!(typst.contains("[T]"));
         assert!(!typst.contains("subtitle: ["));
         assert!(typst.contains("(content:"), "{typst}");
+    }
+
+    #[test]
+    fn alert_helper_is_injected_only_for_alerts() {
+        let source = "#let template(body) = { for element in body { element.content } }";
+        let template = Template::from_source(source, "test.typ", TemplateOptions::default())
+            .expect("build template");
+
+        let alert_doc = parse("> [!NOTE]\n> Body");
+        let typst = template.build(&alert_doc).expect("build alert document");
+        assert!(typst.contains("#let _tome_md_github_alert"), "{typst}");
+        assert!(
+            typst.contains("#_tome_md_github_alert(\"note\")["),
+            "{typst}"
+        );
+
+        let plain_doc = parse("Just text");
+        let typst = template.build(&plain_doc).expect("build plain document");
+        assert!(!typst.contains("_tome_md_github_alert"), "{typst}");
     }
 
     #[test]

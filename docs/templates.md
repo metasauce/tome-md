@@ -133,6 +133,18 @@ invalid signature is a usage error (exit 2). The bundled default is loaded at
 render time, so its failures are runtime errors (exit 1). See
 [development.md](development.md) for the error chain printed by the CLI.
 
+## GitHub alerts
+
+GitHub alert blockquotes render through a small Typst helper that the renderer
+injects only into documents containing an alert. Existing templates continue to
+style ordinary blockquotes normally. Alerts use a self-contained GitHub-style
+block and are not restyled by `show quote` rules; a template can deliberately
+override `_tome_md_github_alert` if it needs a different appearance.
+
+A table inside a blockquote is emitted inline with the quote content so the
+quote structure stays balanced. Such inline tables are not exposed as separate
+`Element::Table` data.
+
 ## Tables as data
 
 Every element has a `content` field. Table elements also carry plain-text rows
