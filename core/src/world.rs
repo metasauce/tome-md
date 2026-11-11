@@ -9,7 +9,9 @@ use typst::syntax::{FileId, RootedPath, Source, VirtualPath, VirtualRoot};
 use typst::text::{Font, FontBook};
 use typst::utils::LazyHash;
 use typst::{Library, LibraryExt};
+use typst_kit::downloader::SystemDownloader;
 use typst_kit::fonts::{self as kit_fonts, FontStore};
+use typst_kit::packages::SystemPackages;
 
 /// The standard library is immutable; build it once per process.
 static LIBRARY: LazyLock<LazyHash<Library>> =
@@ -19,6 +21,7 @@ static LIBRARY: LazyLock<LazyHash<Library>> =
 /// optional system fallback fonts.
 pub struct PdfWorld {
     fonts: FontStore,
+    packages: SystemPackages,
     main: Source,
     main_id: FileId,
     asset_dir: Option<PathBuf>,
@@ -44,6 +47,7 @@ impl PdfWorld {
         let main_id = main_id();
         Self {
             fonts,
+            packages: SystemPackages::new(SystemDownloader::new("tome-md")),
             main: Source::new(main_id, source),
             main_id,
             asset_dir: asset_dir.map(normalize_asset_dir),
@@ -130,6 +134,15 @@ impl typst::World for PdfWorld {
             return Ok(Bytes::new(self.main.text().as_bytes().to_vec()));
         }
         if let Some(bytes) = self.cached_asset(id) {
+            return Ok(bytes);
+        }
+
+        if let VirtualRoot::Package(spec) = id.root() {
+            let root = self.packages.obtain(spec).map_err(|error| {
+                FileError::Other(Some(format!("cannot load package {spec}: {error}").into()))
+            })?;
+            let bytes = root.load(id.vpath())?;
+            self.cache_asset(id, bytes.clone());
             return Ok(bytes);
         }
 

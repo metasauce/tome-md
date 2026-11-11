@@ -18,6 +18,9 @@ pub enum Error {
     #[error("invalid template {path}: {message}")]
     InvalidTemplate { path: PathBuf, message: String },
 
+    #[error("invalid front matter: {message}")]
+    FrontMatter { message: String },
+
     #[error("template {path} is missing front matter key(s): {keys}")]
     MissingFrontMatter { path: PathBuf, keys: String },
 

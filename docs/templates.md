@@ -26,9 +26,34 @@ Pass the entry point explicitly with `-t/--template`; there is no discovery.
    call the template.
 
 The folder is self-contained: copy it anywhere and it still works, and its
-assets are not embedded in the binary. System fallback fonts are opt-in via
+assets are not embedded in the binary. Templates can also import Typst Universe
+packages by name; those are downloaded on first use and then served from the
+package cache. System fallback fonts are opt-in via
 `TemplateOptions::use_system_fonts`; the bundled plain template enables them.
 On-disk templates always get Typst's embedded base fonts plus their own fonts.
+
+## Packages
+
+A template can import a Typst Universe package directly:
+
+```typst
+#import "@preview/letter-pro:3.0.0": letter-generic
+
+#let template(title, body) = {
+  letter-generic({
+    strong(title)
+    v(0.65em)
+    for element in body {
+      element.content
+    }
+  })
+}
+```
+
+Missing packages are downloaded into Typst's package cache on first render and
+resolved from there afterwards. Pin the version in the import: templates that
+use `@preview` packages are not fully self-contained until the package is
+cached.
 
 ## Arguments and validation
 
@@ -41,8 +66,9 @@ the renderer matches front matter keys by name:
   the Typst default applies;
 - **`body`** — must be positional; receives the document as a list of
   elements, each with `content` (Typst) and `data` (`none` or table rows);
-- values are Typst content (`subtitle: Hello` → `[Hello]`); front matter is
-  flat and case-sensitive.
+- scalar values are Typst content (`subtitle: Hello` → `[Hello]`); nested
+  mappings become Typst dictionaries and sequences become arrays; front matter
+  is case-sensitive.
 
 Arguments are emitted in signature order. Duplicate parameters, destructuring,
 `..args` and a named or missing `body` are rejected at load time. Unused keys
@@ -71,6 +97,34 @@ subtitle: A short example
 ```
 
 Only `title` is required above; `subtitle` is optional.
+
+Nested YAML keys become dictionaries, so parameters can group related values:
+
+```markdown
+---
+sender:
+  name: Jane Doe
+  address: 1 Example Street
+recipient:
+  name: Example GmbH
+  address: 2 Sample Road
+---
+```
+
+```typst
+#let template(sender, recipient, body) = {
+  sender.name
+  sender.address
+  recipient.name
+  recipient.address
+  for element in body {
+    element.content
+  }
+}
+```
+
+The template receives `sender` and `recipient` as Typst dictionaries. See
+[markdown.md](markdown.md#front-matter) for the supported YAML forms.
 
 ## Errors
 
@@ -116,6 +170,7 @@ Liberation Sans / DejaVu Sans fallback).
 
 Typst's embedded base fonts (Libertinus Serif, New Computer Modern, DejaVu
 Sans Mono) are always available, so a template without a `fonts/` folder still
-renders. The example templates rely on those fonts. Put additional static fonts
-in `<template>/fonts/` together with their licences and provenance notes; the
-bundled plain template uses system fonts.
+renders. Most example templates rely on those fonts; `letter-din` bundles
+Source Sans 3. Put additional static fonts in `<template>/fonts/` together with
+their licences and provenance notes; the bundled plain template uses system
+fonts.

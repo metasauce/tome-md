@@ -1,11 +1,88 @@
 //! Markdown -> Typst conversion with a small GFM subset.
 
 use pulldown_cmark::{Alignment, CodeBlockKind, Event, Options, Parser, Tag, TagEnd};
+use serde_yaml_ng::{Mapping, Value};
+
+use crate::error::Error;
 
 /// A parsed document: front-matter values and the rendered element list.
+#[derive(Debug)]
 pub struct Document {
-    pub meta: std::collections::BTreeMap<String, String>,
+    pub meta: Meta,
     pub elements: Vec<Element>,
+}
+
+/// One parsed front-matter value.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum MetaValue {
+    /// A scalar, converted to a string (dates, numbers and booleans included).
+    Scalar(String),
+    /// A nested mapping, in source order.
+    Mapping(std::collections::BTreeMap<String, MetaValue>),
+    /// A YAML sequence.
+    Sequence(Vec<MetaValue>),
+    /// An explicit YAML null.
+    Null,
+}
+
+/// Top-level front-matter keys and their values.
+pub type Meta = std::collections::BTreeMap<String, MetaValue>;
+
+impl MetaValue {
+    /// The scalar text, if this is a scalar.
+    pub fn as_scalar(&self) -> Option<&str> {
+        match self {
+            Self::Scalar(value) => Some(value),
+            Self::Mapping(_) | Self::Sequence(_) | Self::Null => None,
+        }
+    }
+
+    /// The nested mapping, if this is a mapping.
+    pub fn as_mapping(&self) -> Option<&std::collections::BTreeMap<String, Self>> {
+        match self {
+            Self::Mapping(value) => Some(value),
+            Self::Scalar(_) | Self::Sequence(_) | Self::Null => None,
+        }
+    }
+
+    /// Render this value as a Typst expression: content for scalars,
+    /// dictionaries for mappings and arrays for sequences.
+    pub(crate) fn to_typst(&self) -> String {
+        match self {
+            Self::Scalar(value) => format!("[{}]", escape_typst(value)),
+            Self::Null => "none".to_owned(),
+            Self::Sequence(values) => {
+                let values = values
+                    .iter()
+                    .map(Self::to_typst)
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                if values.is_empty() {
+                    "()".to_owned()
+                } else {
+                    format!("({values},)")
+                }
+            }
+            Self::Mapping(values) => {
+                if values.is_empty() {
+                    return "(:)".to_owned();
+                }
+                let fields = values
+                    .iter()
+                    .map(|(key, value)| {
+                        let key = if is_typst_ident(key) {
+                            key.clone()
+                        } else {
+                            format!("\"{}\"", escape_string(key))
+                        };
+                        format!("{key}: {}", value.to_typst())
+                    })
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                format!("({fields})")
+            }
+        }
+    }
 }
 
 /// One element of the rendered Markdown, in document order.
@@ -49,12 +126,12 @@ impl Document {
 }
 
 /// Parse Markdown (optional `key: value` front matter) and emit elements.
-pub fn parse(markdown: &str) -> Document {
-    let (meta, body) = split_frontmatter(markdown);
-    Document {
+pub fn parse(markdown: &str) -> Result<Document, Error> {
+    let (meta, body) = split_frontmatter(markdown)?;
+    Ok(Document {
         meta,
         elements: to_elements(body),
-    }
+    })
 }
 
 /// Extract the Markdown tables as plain-text data. The first row is the header.
@@ -105,40 +182,128 @@ fn push_cell(cell: &mut Option<String>, text: &str) {
     }
 }
 
-fn split_frontmatter(input: &str) -> (std::collections::BTreeMap<String, String>, &str) {
+fn split_frontmatter(input: &str) -> Result<(Meta, &str), Error> {
     let input = input.strip_prefix('\u{feff}').unwrap_or(input);
-    let mut meta = std::collections::BTreeMap::new();
+    let meta = Meta::new();
     let Some((first, mut rest)) = input.split_once('\n') else {
-        return (meta, input);
+        return Ok((meta, input));
     };
     if first.trim() != "---" {
-        return (meta, input);
+        return Ok((meta, input));
     }
 
+    let mut yaml = String::new();
     loop {
         let Some((line, after)) = rest.split_once('\n') else {
             if rest.trim() == "---" {
-                return (meta, "");
+                return Ok((parse_frontmatter(&yaml)?, ""));
             }
-            return (std::collections::BTreeMap::new(), input);
+            return Ok((Meta::new(), input));
         };
 
-        if line.trim() == "---" {
-            return (meta, after.trim_start_matches(['\r', '\n']));
+        let line = line.trim_end_matches('\r');
+        if line.trim_end() == "---" {
+            return Ok((
+                parse_frontmatter(&yaml)?,
+                after.trim_start_matches(['\r', '\n']),
+            ));
         }
 
-        if let Some((key, value)) = line.trim().split_once(':') {
-            let key = key.trim();
-            if !key.is_empty() {
-                meta.insert(
-                    key.to_owned(),
-                    value.trim().trim_matches(['"', '\'']).to_owned(),
-                );
-            }
+        if !yaml.is_empty() {
+            yaml.push('\n');
         }
-
+        yaml.push_str(line);
         rest = after;
     }
+}
+
+fn parse_frontmatter(yaml: &str) -> Result<Meta, Error> {
+    if yaml.trim().is_empty() {
+        return Ok(Meta::new());
+    }
+
+    let value: Value = serde_yaml_ng::from_str(yaml).map_err(|error| Error::FrontMatter {
+        message: error.to_string(),
+    })?;
+    let Value::Mapping(mapping) = value else {
+        return Err(Error::FrontMatter {
+            message: "the front matter must be a YAML mapping".to_owned(),
+        });
+    };
+
+    mapping_to_meta(mapping)
+}
+
+fn mapping_to_meta(mapping: Mapping) -> Result<Meta, Error> {
+    let mut meta = Meta::new();
+    for (key, value) in mapping {
+        let Value::String(key) = key else {
+            return Err(Error::FrontMatter {
+                message: "front matter keys must be strings".to_owned(),
+            });
+        };
+        meta.insert(key, yaml_to_meta(value)?);
+    }
+    Ok(meta)
+}
+
+fn yaml_to_meta(value: Value) -> Result<MetaValue, Error> {
+    match value {
+        Value::Null => Ok(MetaValue::Null),
+        Value::Bool(value) => Ok(MetaValue::Scalar(value.to_string())),
+        Value::Number(value) => Ok(MetaValue::Scalar(value.to_string())),
+        Value::String(value) => Ok(MetaValue::Scalar(value)),
+        Value::Sequence(values) => values
+            .into_iter()
+            .map(yaml_to_meta)
+            .collect::<Result<Vec<_>, _>>()
+            .map(MetaValue::Sequence),
+        Value::Mapping(mapping) => {
+            let mut values = std::collections::BTreeMap::new();
+            for (key, value) in mapping {
+                let Value::String(key) = key else {
+                    return Err(Error::FrontMatter {
+                        message: "nested front matter keys must be strings".to_owned(),
+                    });
+                };
+                values.insert(key, yaml_to_meta(value)?);
+            }
+            Ok(MetaValue::Mapping(values))
+        }
+        Value::Tagged(value) => yaml_to_meta(value.value),
+    }
+}
+
+fn is_typst_ident(value: &str) -> bool {
+    let mut chars = value.chars();
+    let first = chars.next();
+    let rest_valid = chars.all(|ch| ch == '_' || ch.is_alphanumeric());
+    let is_keyword = matches!(
+        value,
+        "none"
+            | "auto"
+            | "true"
+            | "false"
+            | "let"
+            | "set"
+            | "show"
+            | "if"
+            | "else"
+            | "for"
+            | "in"
+            | "while"
+            | "break"
+            | "continue"
+            | "return"
+            | "import"
+            | "include"
+            | "as"
+            | "context"
+            | "and"
+            | "or"
+            | "not"
+    );
+    first.is_some_and(|first| first == '_' || first.is_alphabetic()) && rest_valid && !is_keyword
 }
 
 fn to_elements(markdown: &str) -> Vec<Element> {
@@ -519,12 +684,97 @@ fn raw_inline(text: &str) -> String {
 mod tests {
     use super::*;
 
+    fn parse_ok(input: &str) -> Document {
+        parse(input).expect("parse markdown")
+    }
+
+    #[test]
+    fn nested_frontmatter() {
+        let doc = parse_ok(
+            "---\nsender:\n  name: Anja Ahlsen\n  address:\n    street: Beispielallee 28\nrecipient:\n  name: Finanzamt\n---\n\nHello",
+        );
+        let sender = doc
+            .meta
+            .get("sender")
+            .and_then(MetaValue::as_mapping)
+            .expect("sender mapping");
+        assert_eq!(
+            sender.get("name").and_then(MetaValue::as_scalar),
+            Some("Anja Ahlsen")
+        );
+        let address = sender
+            .get("address")
+            .and_then(MetaValue::as_mapping)
+            .expect("nested address mapping");
+        assert_eq!(
+            address.get("street").and_then(MetaValue::as_scalar),
+            Some("Beispielallee 28")
+        );
+    }
+
+    #[test]
+    fn invalid_frontmatter_is_an_error() {
+        let error = parse("---\nsender: [unterminated\n---\n").expect_err("invalid YAML");
+        assert!(
+            error.to_string().contains("invalid front matter"),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn nested_values_render_as_typst() {
+        let value = MetaValue::Mapping(std::collections::BTreeMap::from([
+            (
+                "tags".to_owned(),
+                MetaValue::Sequence(vec![
+                    MetaValue::Scalar("a".to_owned()),
+                    MetaValue::Scalar("b".to_owned()),
+                ]),
+            ),
+            (
+                "empty".to_owned(),
+                MetaValue::Mapping(std::collections::BTreeMap::new()),
+            ),
+            (
+                "child".to_owned(),
+                MetaValue::Mapping(std::collections::BTreeMap::from([(
+                    "name".to_owned(),
+                    MetaValue::Scalar("Jane".to_owned()),
+                )])),
+            ),
+        ]));
+        assert_eq!(
+            value.to_typst(),
+            "(child: (name: [Jane]), empty: (:), tags: ([a], [b],))"
+        );
+    }
+
+    #[test]
+    fn frontmatter_sequences_and_nulls() {
+        let doc = parse_ok("---\ntags: [a, b]\nempty:\n---\n");
+        assert_eq!(
+            doc.meta.get("tags"),
+            Some(&MetaValue::Sequence(vec![
+                MetaValue::Scalar("a".to_owned()),
+                MetaValue::Scalar("b".to_owned()),
+            ]))
+        );
+        assert_eq!(doc.meta.get("empty"), Some(&MetaValue::Null));
+    }
+
     #[test]
     fn frontmatter_and_basics() {
-        let doc =
-            parse("---\ntitle: Hello\ndate: 2026-01-02\n---\n\n# Hi\n\nSome *text* and `code`.\n");
-        assert_eq!(doc.meta.get("title").map(String::as_str), Some("Hello"));
-        assert_eq!(doc.meta.get("date").map(String::as_str), Some("2026-01-02"));
+        let doc = parse_ok(
+            "---\ntitle: Hello\ndate: 2026-01-02\n---\n\n# Hi\n\nSome *text* and `code`.\n",
+        );
+        assert_eq!(
+            doc.meta.get("title").and_then(MetaValue::as_scalar),
+            Some("Hello")
+        );
+        assert_eq!(
+            doc.meta.get("date").and_then(MetaValue::as_scalar),
+            Some("2026-01-02")
+        );
         assert!(doc.body().contains("= Hi"));
         assert!(doc.body().contains("#emph[text]"));
         assert!(doc.body().contains("`code`"));
@@ -532,7 +782,7 @@ mod tests {
 
     #[test]
     fn table() {
-        let doc = parse("| A | B |\n| :- | -: |\n| 1 | 2 |\n");
+        let doc = parse_ok("| A | B |\n| :- | -: |\n| 1 | 2 |\n");
         assert!(doc.body().contains("#table("));
         assert!(doc.body().contains("table.header"));
         assert!(doc.body().contains("align: (left, right)"));
@@ -540,13 +790,13 @@ mod tests {
 
     #[test]
     fn escapes_a_leading_slash() {
-        let doc = parse("/ hello");
+        let doc = parse_ok("/ hello");
         assert!(doc.body().contains("\\/ hello"), "body: {}", doc.body());
     }
 
     #[test]
     fn code_block_uses_a_fence_longer_than_its_content() {
-        let doc = parse("````\n```\ninside\n```\n````\n");
+        let doc = parse_ok("````\n```\ninside\n```\n````\n");
         assert!(
             doc.body().contains("````\n```\ninside\n```\n````"),
             "body: {}",
@@ -556,7 +806,7 @@ mod tests {
 
     #[test]
     fn preserves_an_ordered_list_start() {
-        let doc = parse("3. third\n4. fourth\n");
+        let doc = parse_ok("3. third\n4. fourth\n");
         assert!(
             doc.body().contains("#set enum(start: 3)"),
             "body: {}",
@@ -566,21 +816,24 @@ mod tests {
 
     #[test]
     fn empty_link_destination_is_rendered_as_text() {
-        let doc = parse("[x]()");
+        let doc = parse_ok("[x]()");
         assert!(!doc.body().contains("#link(\"\")"), "body: {}", doc.body());
         assert!(doc.body().contains('x'), "body: {}", doc.body());
     }
 
     #[test]
     fn strips_a_bom_before_front_matter() {
-        let doc = parse("\u{feff}---\ntitle: BOM\n---\n\nHello");
-        assert_eq!(doc.meta.get("title").map(String::as_str), Some("BOM"));
+        let doc = parse_ok("\u{feff}---\ntitle: BOM\n---\n\nHello");
+        assert_eq!(
+            doc.meta.get("title").and_then(MetaValue::as_scalar),
+            Some("BOM")
+        );
         assert!(!doc.body().contains("title: BOM"), "body: {}", doc.body());
     }
 
     #[test]
     fn collects_tables_as_plain_text() {
-        let doc = parse(
+        let doc = parse_ok(
             "| Std. | Tätigkeit |\n| ---: | --- |\n| 4,0 | **Setup** [PR](https://example.com) |\n",
         );
         let tables = doc.tables().collect::<Vec<_>>();
@@ -591,7 +844,7 @@ mod tests {
 
     #[test]
     fn collects_multiple_tables() {
-        let doc = parse("| A |\n| --- |\n| 1 |\n\n| B |\n| --- |\n| 2 |\n");
+        let doc = parse_ok("| A |\n| --- |\n| 1 |\n\n| B |\n| --- |\n| 2 |\n");
         let tables = doc.tables().collect::<Vec<_>>();
         assert_eq!(tables.len(), 2);
         assert_eq!(tables[0].rows[1], vec!["1"]);
@@ -600,7 +853,7 @@ mod tests {
 
     #[test]
     fn elements_keep_tables_in_document_order() {
-        let doc = parse("Hello\n\n| A |\n| --- |\n| 1 |\n\nWorld\n");
+        let doc = parse_ok("Hello\n\n| A |\n| --- |\n| 1 |\n\nWorld\n");
         let kinds = doc
             .elements
             .iter()

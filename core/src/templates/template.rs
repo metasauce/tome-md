@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use tracing::debug;
 
 use crate::error::Error;
-use crate::markdown::{Document, Element, MarkdownTable, escape_typst};
+use crate::markdown::{Document, Element, MarkdownTable};
 
 use super::entry::{ParamKind, TemplateEntry, TemplateParam};
 
@@ -129,12 +129,12 @@ fn template_argument(param: &TemplateParam, doc: &Document) -> Option<String> {
         ParamKind::Positional if param.name == "body" => Some(elements_literal(&doc.elements)),
         ParamKind::Positional => {
             let value = doc.meta.get(&param.name)?;
-            Some(format!("[{}]", escape_typst(value)))
+            Some(value.to_typst())
         }
         ParamKind::Named => doc
             .meta
             .get(&param.name)
-            .map(|value| format!("{}: [{}]", param.name, escape_typst(value))),
+            .map(|value| format!("{}: {}", param.name, value.to_typst())),
     }
 }
 
@@ -196,6 +196,10 @@ mod tests {
     use super::*;
     use crate::markdown;
 
+    fn parse(input: &str) -> markdown::Document {
+        markdown::parse(input).expect("parse markdown")
+    }
+
     #[test]
     fn loads_self_contained_template() {
         let path =
@@ -251,7 +255,7 @@ mod tests {
         let template =
             Template::from_path(path, TemplateOptions::default()).expect("load fixture template");
         let error = template
-            .validate(&markdown::parse("# Hi"))
+            .validate(&parse("# Hi"))
             .expect_err("missing title");
         assert!(error.to_string().contains("title"));
     }
@@ -261,7 +265,7 @@ mod tests {
         let source = "#let template(title, subtitle: none, body) = { body }";
         let template = Template::from_source(source, "test.typ", TemplateOptions::default())
             .expect("build template");
-        let doc = markdown::parse("---\ntitle: T\n---\nHi");
+        let doc = parse("---\ntitle: T\n---\nHi");
         let typst = template.build(&doc).expect("build document");
         assert!(typst.contains("[T]"));
         assert!(!typst.contains("subtitle: ["));
@@ -269,11 +273,24 @@ mod tests {
     }
 
     #[test]
+    fn nested_frontmatter_parameter_is_a_dictionary() {
+        let source = "#let template(sender, body) = { for element in body { element.content } }";
+        let template = Template::from_source(source, "test.typ", TemplateOptions::default())
+            .expect("build template");
+        let doc = parse("---\nsender:\n  name: Jane Doe\n  address: 1 Example Street\n---\nHi");
+        let typst = template.build(&doc).expect("build document");
+        assert!(
+            typst.contains("(address: [1 Example Street], name: [Jane Doe])"),
+            "{typst}"
+        );
+    }
+
+    #[test]
     fn tables_are_inside_the_element_list() {
         let source = "#let template(body) = { body }";
         let template = Template::from_source(source, "test.typ", TemplateOptions::default())
             .expect("build template");
-        let doc = markdown::parse("| Std. | Tätigkeit |\n| ---: | --- |\n| 4,0 | Setup |");
+        let doc = parse("| Std. | Tätigkeit |\n| ---: | --- |\n| 4,0 | Setup |");
         let typst = template.build(&doc).expect("build document");
         assert!(
             typst.contains(r#"data: (("Std.","Tätigkeit",),("4,0","Setup",),)"#),
@@ -286,7 +303,7 @@ mod tests {
         let source = "#let template(body) = { body }";
         let template = Template::from_source(source, "test.typ", TemplateOptions::default())
             .expect("build template");
-        let doc = markdown::parse("| A |\n| --- |\n| 1 |");
+        let doc = parse("| A |\n| --- |\n| 1 |");
         let typst = template
             .build(&doc)
             .expect("body is supplied by the parser");
@@ -298,7 +315,7 @@ mod tests {
         let source = "#let template(body) = { body }";
         let template = Template::from_source(source, "test.typ", TemplateOptions::default())
             .expect("build template");
-        let doc = markdown::parse("No table here");
+        let doc = parse("No table here");
         let typst = template.build(&doc).expect("build document");
         assert!(typst.contains("data: none"), "{typst}");
     }

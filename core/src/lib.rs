@@ -48,10 +48,14 @@ pub fn render_pdf(markdown: &str, template: &Template) -> Result<Vec<u8>, Error>
 /// The shared pipeline. Returns the Typst world so callers can decide whether
 /// to copy the generated source out before dropping it.
 fn render_world(markdown: &str, template: &Template) -> Result<(PdfWorld, Vec<u8>), Error> {
-    let doc = markdown::parse(markdown);
+    let doc = markdown::parse(markdown)?;
     debug!(
         markdown_bytes = markdown.len(),
-        title = doc.meta.get("title").map(String::as_str).unwrap_or("-"),
+        title = doc
+            .meta
+            .get("title")
+            .and_then(markdown::MetaValue::as_scalar)
+            .unwrap_or("-"),
         "parsed Markdown"
     );
 

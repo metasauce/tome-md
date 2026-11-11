@@ -34,10 +34,31 @@ date: 2026-01-02
 # Content
 ```
 
-The fence must be `---` on its own line. Entries are literal `key: value` pairs
-— this is not full YAML. Surrounding quotes are stripped, keys are
-case-sensitive and must fit on one line. Values are inserted into the template
-as Typst content, so `subtitle: Hello` becomes `[Hello]`.
+The fence must be `---` on its own line. The content between the fences is
+YAML, so nested mappings, sequences, multiline strings and quoted values work:
+
+```markdown
+---
+sender:
+  name: Jane Doe
+  address: 1 Example Street
+recipient:
+  name: Example GmbH
+  address: 2 Sample Road
+tags: [invoice, reminder]
+note: >
+  Folded multiline text
+---
+
+# Content
+```
+
+Top-level keys are matched to template parameters; nested mappings become Typst
+dictionaries (`sender.name`, `sender.address`), sequences become arrays, and
+scalars are inserted as Typst content (`subtitle: Hello` becomes `[Hello]`).
+YAML `null` becomes Typst `none`. Keys are case-sensitive.
+
+Invalid YAML aborts rendering with an `invalid front matter` error.
 
 Unknown keys are ignored and logged at debug level.
 
