@@ -9,7 +9,7 @@ use super::entry::{ParamKind, TemplateEntry, TemplateParam};
 
 /// Options used when rendering a template.
 ///
-/// Self-contained by default: only the template's own fonts are used.
+/// Self-contained by default: template fonts plus Typst's embedded base fonts.
 #[derive(Debug, Clone, Default)]
 #[non_exhaustive]
 pub struct TemplateOptions {

@@ -474,7 +474,10 @@ impl Emitter {
 pub(crate) fn escape_typst(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
     for ch in text.chars() {
-        if is_typst_special(ch) {
+        // Front-matter values are wrapped in `[...]`, where a leading `4.`
+        // would otherwise become an enumeration. Escaping `.` keeps values
+        // like dates as plain text.
+        if is_typst_special(ch) || ch == '.' {
             out.push('\\');
         }
         out.push(if ch == '\n' { ' ' } else { ch });

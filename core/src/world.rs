@@ -9,7 +9,7 @@ use typst::syntax::{FileId, RootedPath, Source, VirtualPath, VirtualRoot};
 use typst::text::{Font, FontBook};
 use typst::utils::LazyHash;
 use typst::{Library, LibraryExt};
-use typst_kit::fonts::FontStore;
+use typst_kit::fonts::{self as kit_fonts, FontStore};
 
 /// The standard library is immutable; build it once per process.
 static LIBRARY: LazyLock<LazyHash<Library>> =
@@ -29,6 +29,9 @@ pub struct PdfWorld {
 impl PdfWorld {
     pub fn new(source: String, asset_dir: Option<PathBuf>, use_system_fonts: bool) -> Self {
         let mut fonts = FontStore::new();
+        // Typst's bundled base fonts (Libertinus Serif, New Computer Modern,
+        // DejaVu Sans Mono) keep font-less templates usable.
+        fonts.extend(kit_fonts::embedded());
 
         if let Some(dir) = &asset_dir {
             fonts.extend(crate::fonts::template_fonts(dir));
@@ -237,6 +240,12 @@ mod tests {
         );
 
         cleanup(&dir);
+    }
+
+    #[test]
+    fn embedded_fonts_are_available() {
+        let world = PdfWorld::new("Hello".to_owned(), None, false);
+        assert!(world.book().contains_family("libertinus serif"));
     }
 
     #[test]

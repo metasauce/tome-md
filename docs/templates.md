@@ -27,8 +27,8 @@ Pass the entry point explicitly with `-t/--template`; there is no discovery.
 
 The folder is self-contained: copy it anywhere and it still works, and its
 assets are not embedded in the binary. System fallback fonts are opt-in via
-`TemplateOptions::use_system_fonts`; the bundled plain template enables them,
-while on-disk templates use only their own fonts by default.
+`TemplateOptions::use_system_fonts`; the bundled plain template enables them.
+On-disk templates always get Typst's embedded base fonts plus their own fonts.
 
 ## Arguments and validation
 
@@ -86,7 +86,7 @@ in `data`, so a template can render the document and compute from the tables
 without a separate argument:
 
 ```typst
-#let template(invoice, body) = {
+#let template(title, body) = {
   let tables = body
     .filter(element => element.data != none)
     .map(element => element.data)
@@ -103,9 +103,8 @@ The first row is the header. Cells are plain text: emphasis, code and links
 lose their formatting, and a link becomes its label.
 The field is populated by the parser and is never read from front matter.
 
-The invoice template in `templates/invoice/` uses this to sum the hours column
-and compute the invoice amount from the same Markdown file that produces the
-Leistungsübersicht.
+This lets a template render the document and still compute totals or summaries
+from the tables in it.
 
 ## Bundled template
 
@@ -115,7 +114,8 @@ Liberation Sans / DejaVu Sans fallback).
 
 ## Fonts and licences
 
-Templates supply their own fonts: put static font files in `<template>/fonts/`
-together with their licences and provenance notes. The bundled plain template
-uses system fonts; the invoice example in `templates/invoice/` ships Latin
-Modern Mono with its licence.
+Typst's embedded base fonts (Libertinus Serif, New Computer Modern, DejaVu
+Sans Mono) are always available, so a template without a `fonts/` folder still
+renders. The example templates rely on those fonts. Put additional static fonts
+in `<template>/fonts/` together with their licences and provenance notes; the
+bundled plain template uses system fonts.
