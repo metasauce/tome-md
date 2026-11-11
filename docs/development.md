@@ -70,6 +70,25 @@ reported by clap as usage errors (exit 2).
   linking is much faster than a size-oriented LTO build while still producing a
   fast binary.
 
+## Markdown formatting
+
+Markdown is formatted with [Prettier](https://prettier.io/) through
+[prek](https://prek.j178.dev/):
+
+```sh
+cargo install --locked prek
+prek install
+```
+
+Run the hook manually with:
+
+```sh
+prek run --all-files
+```
+
+The hook config is in `.pre-commit-config.yaml`; Prettier options are in
+`.prettierrc.json`. CI runs the same Prettier version on Markdown changes.
+
 ## Checks
 
 ```sh

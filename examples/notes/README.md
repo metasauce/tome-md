@@ -20,7 +20,7 @@ tome examples/notes/example.md \
 The example demonstrates:
 
 - headings at levels 1, 2 and 3
-- paragraphs, **bold**, *italic* and ~~strikethrough~~
+- paragraphs, **bold**, _italic_ and ~~strikethrough~~
 - superscript (`15<sup>th</sup>`) and subscript (`CO<sub>2</sub>`)
 - inline code and fenced code blocks with a language
 - ordered, unordered, nested and task lists
