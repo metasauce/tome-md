@@ -14,7 +14,7 @@ core/                     tome-md-core library
 │  │  ├─ mod.rs           public template API
 │  │  ├─ entry.rs         path, source and signature parsing
 │  │  └─ template.rs      options, asset directory, validation and show rule
-│  └─ world.rs            minimal Typst World (source, fonts, assets)
+│  └─ world.rs            minimal Typst World (source, fonts, assets, packages)
 └─ tests/fixtures/        template fixture for unit tests
 
 cli/                      tome-md binary
@@ -23,6 +23,8 @@ cli/                      tome-md binary
 │  ├─ main.rs             clap CLI
 │  └─ plain.typ           bundled default template
 └─ tests/cli.rs           end-to-end CLI tests
+
+templates/                example templates (letter-din, cv, flyer)
 ```
 
 `core` owns the Typst, Markdown and font dependencies. `cli` owns clap, anyhow,
