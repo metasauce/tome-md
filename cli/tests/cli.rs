@@ -97,6 +97,99 @@ fn refuses_to_clobber_the_pdf_with_keep_typ() {
 }
 
 #[test]
+fn force_never_overwrites_the_input_with_keep_typ() {
+    let dir = temp_dir("keep-typ-input");
+    let template = write_template(&dir);
+    let input = dir.join("input.typ");
+    write_sample(&input);
+    let original = fs::read(&input).expect("read input");
+
+    let output = run(
+        &dir,
+        &[
+            input.as_path(),
+            Path::new("--template"),
+            template.as_path(),
+            Path::new("--keep-typ"),
+            Path::new("--force"),
+        ],
+    );
+
+    assert!(!output.status.success(), "command unexpectedly succeeded");
+    assert!(
+        String::from_utf8_lossy(&output.stderr).contains("would overwrite the input Markdown"),
+        "unexpected stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(fs::read(&input).expect("read input"), original);
+
+    cleanup(&dir);
+}
+
+#[test]
+fn force_never_overwrites_the_template_with_the_pdf() {
+    let dir = temp_dir("template-pdf");
+    let template = write_template(&dir);
+    let input = dir.join("input.md");
+    write_sample(&input);
+    let original = fs::read(&template).expect("read template");
+
+    let output = run(
+        &dir,
+        &[
+            input.as_path(),
+            Path::new("--template"),
+            template.as_path(),
+            Path::new("-o"),
+            template.as_path(),
+            Path::new("--force"),
+        ],
+    );
+
+    assert!(!output.status.success(), "command unexpectedly succeeded");
+    assert!(
+        String::from_utf8_lossy(&output.stderr).contains("refusing to overwrite the template"),
+        "unexpected stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(fs::read(&template).expect("read template"), original);
+
+    cleanup(&dir);
+}
+
+#[test]
+fn force_never_overwrites_the_template_with_keep_typ() {
+    let dir = temp_dir("template-keep-typ");
+    let template = write_template(&dir);
+    let input = dir.join("input.md");
+    write_sample(&input);
+    let original = fs::read(&template).expect("read template");
+
+    let output = run(
+        &dir,
+        &[
+            input.as_path(),
+            Path::new("--template"),
+            template.as_path(),
+            Path::new("-o"),
+            dir.join("template.pdf").as_path(),
+            Path::new("--keep-typ"),
+            Path::new("--force"),
+        ],
+    );
+
+    assert!(!output.status.success(), "command unexpectedly succeeded");
+    assert!(
+        String::from_utf8_lossy(&output.stderr).contains("refusing to overwrite the template"),
+        "unexpected stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(fs::read(&template).expect("read template"), original);
+
+    cleanup(&dir);
+}
+
+#[test]
 fn refuses_to_overwrite_an_existing_output() {
     let dir = temp_dir("existing");
     let template = write_template(&dir);

@@ -40,9 +40,9 @@ tome <input.md> [--template <template.typ>] [-o <out.pdf>] [--keep-typ] [--force
 
 `--template` points at a `.typ` entry point; without it the bundled plain
 template is used. Existing outputs are rejected unless `--force` is given, and
-paths that would overwrite the input Markdown (or the PDF when `--keep-typ` is
-set) are always rejected. Exit codes: `0` success, `1` render error, `2` usage
-error.
+paths that would overwrite the template entry point, the input Markdown (or the
+PDF when `--keep-typ` is set) are always rejected. Exit codes: `0` success, `1`
+render error, `2` usage error.
 
 ## Templates
 

@@ -71,11 +71,36 @@ fn run(cli: Cli) -> Result<()> {
         .clone()
         .unwrap_or_else(|| cli.input.with_extension("pdf"));
     let typst_path = cli.keep_typ.then(|| output.with_extension("typ"));
+    let template_path = template.entry().path();
 
     if same_path(&output, &cli.input) {
         bail!(
             "refusing to overwrite the input Markdown `{}`",
             cli.input.display()
+        );
+    }
+    if typst_path
+        .as_ref()
+        .is_some_and(|path| same_path(path, &cli.input))
+    {
+        bail!(
+            "`--keep-typ` would overwrite the input Markdown `{}`",
+            cli.input.display()
+        );
+    }
+    if same_path(&output, template_path) {
+        bail!(
+            "refusing to overwrite the template `{}`",
+            template_path.display()
+        );
+    }
+    if typst_path
+        .as_ref()
+        .is_some_and(|path| same_path(path, template_path))
+    {
+        bail!(
+            "refusing to overwrite the template `{}`",
+            template_path.display()
         );
     }
     if typst_path
