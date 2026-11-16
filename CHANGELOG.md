@@ -12,6 +12,11 @@ All notable changes to this project are documented here. The format follows
   vertical space, page breaks and layout blocks that Markdown has no syntax
   for. Any other language hint still renders as a code block.
 
+### Fixed
+
+- Quotes, alerts and code blocks sit as close to a heading as a paragraph does.
+  Their 1.2em default spacing used to win over the heading's.
+
 ## 0.2.1 - 2026-11-16
 
 ### Fixed

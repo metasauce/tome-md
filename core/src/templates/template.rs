@@ -30,6 +30,8 @@ const GITHUB_ALERT_HELPER: &str = r##"#let _tome_md_github_alert(kind, body) = {
     stroke: (left: 4pt + style.color),
     inset: (x: 12pt, y: 8pt),
     radius: 2pt,
+    above: 0.7em,
+    below: 0.7em,
   )[
     #text(weight: "bold", fill: style.color)[#style.label]
     #v(0.35em)
