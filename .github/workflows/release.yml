@@ -4,12 +4,19 @@ on:
   push:
     tags:
       - "v*"
+  # Re-release an existing tag, or retry a tag whose build failed.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to release, e.g. v0.2.0"
+        required: true
+        type: string
 
 permissions:
   contents: read
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-${{ inputs.tag || github.ref_name }}
   cancel-in-progress: false
 
 env:
@@ -21,14 +28,28 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+          ref: ${{ inputs.tag || github.ref }}
       - name: Compare tag with workspace version
+        env:
+          TAG: ${{ inputs.tag || github.ref_name }}
         run: |
           version=$(cargo metadata --no-deps --offline --format-version 1 \
             | jq -r '.packages[] | select(.name == "tome-md") | .version')
-          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
-            echo "::error::tag $GITHUB_REF_NAME does not match version v$version"
+          if [ "v$version" != "$TAG" ]; then
+            echo "::error::tag $TAG does not match version v$version"
             exit 1
           fi
+
+          previous=$(git tag --list 'v*' --sort=-v:refname | grep -vx "$TAG" | head -n1)
+          if [ -n "$previous" ] \
+            && [ "$(printf '%s\n%s\n' "$previous" "$TAG" | sort -V | tail -n1)" != "$TAG" ]; then
+            echo "::error::$TAG is older than the latest tag $previous"
+            exit 1
+          fi
+          echo "previous tag: ${previous:-none}"
 
   build:
     name: ${{ matrix.target }}
@@ -55,6 +76,8 @@ jobs:
             ext: ".exe"
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag || github.ref }}
       - uses: actions-rust-lang/setup-rust-toolchain@v2
       - name: Build
         run: cargo build --locked --profile small -p tome-md --target ${{ matrix.target }}
@@ -79,6 +102,8 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag || github.ref }}
       - uses: actions/download-artifact@v8
         with:
           path: dist
@@ -92,7 +117,8 @@ jobs:
         run: ls -l dist
       - uses: softprops/action-gh-release@v3
         with:
+          tag_name: ${{ inputs.tag || github.ref_name }}
           files: dist/*
           fail_on_unmatched_files: true
           generate_release_notes: true
-          prerelease: ${{ contains(github.ref_name, '-') }}
+          prerelease: ${{ contains(inputs.tag || github.ref_name, '-') }}
