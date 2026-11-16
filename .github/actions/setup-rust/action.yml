@@ -1,0 +1,49 @@
+name: Setup Rust build
+description: >
+  Verify the system packages the Rust build needs, then set up the Rust
+  toolchain with caching. typst-kit pulls native-tls and openssl on Linux, so
+  openssl-sys requires pkg-config and the OpenSSL headers at build time; the
+  runner image provides them.
+
+inputs:
+  toolchain:
+    description: "Rust toolchain to install. Defaults to stable when empty."
+    required: false
+    default: ""
+  components:
+    description: "Comma-separated rustup components to add, e.g. clippy or rustfmt."
+    required: false
+    default: ""
+  cache:
+    description: "Cache the cargo registry and target directory."
+    required: false
+    default: "true"
+
+runs:
+  using: composite
+  steps:
+    # The runners are per-job containers running as a non-root user without
+    # sudo, so nothing can be installed here. Check instead, and fail with the
+    # actual cause rather than a build script error 40 seconds later.
+    - name: Check OpenSSL build deps
+      if: runner.os == 'Linux'
+      shell: bash
+      run: |
+        if ! command -v pkg-config >/dev/null 2>&1; then
+          echo "::error::pkg-config is missing from the runner image (needed by openssl-sys); install pkg-config and libssl-dev in the image"
+          exit 1
+        fi
+        if ! pkg-config --exists openssl; then
+          echo "::error::OpenSSL headers not found (pkg-config --exists openssl failed); install libssl-dev in the runner image"
+          exit 1
+        fi
+        echo "pkg-config $(pkg-config --modversion openssl) available"
+
+    - uses: actions-rust-lang/setup-rust-toolchain@v2
+      with:
+        toolchain: ${{ inputs.toolchain }}
+        components: ${{ inputs.components }}
+        cache: ${{ inputs.cache }}
+        # A failed build leaves a half-populated target dir; uploading it costs
+        # minutes on a self-hosted uplink and saves nothing usable.
+        cache-on-failure: false
