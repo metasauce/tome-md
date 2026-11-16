@@ -414,6 +414,25 @@ impl Emitter {
         }
     }
 
+    /// Ensure the next write starts on a new line, but never add a second one.
+    /// A blank line inside a list is a paragraph break to Typst: items then get
+    /// `par` spacing instead of list spacing, and nested items drift right.
+    fn line_break(&mut self) {
+        if !self.at_line_start() {
+            self.write("\n");
+        }
+    }
+
+    fn at_line_start(&self) -> bool {
+        self.cell.as_deref().unwrap_or(&self.out).ends_with('\n')
+    }
+
+    /// Two spaces per nesting level, with top-level items at the margin so they
+    /// line up with the surrounding text.
+    fn list_indent(&self) -> String {
+        "  ".repeat(self.list_stack.len().saturating_sub(1))
+    }
+
     fn event(&mut self, event: Event<'_>) {
         if let Some(image) = &mut self.image {
             match event {
@@ -536,17 +555,16 @@ impl Emitter {
                     start,
                 };
                 self.list_stack.push(state);
-                self.write("\n");
+                self.line_break();
                 if let Some(start) = start.filter(|start| *start != 1) {
-                    let indent = " ".repeat(self.list_stack.len() * 2);
+                    let indent = self.list_indent();
                     self.write(&format!("{indent}#set enum(start: {start})\n"));
                 }
             }
             Tag::Item => {
-                self.write("\n");
-                for _ in 0..self.list_stack.len() {
-                    self.write("  ");
-                }
+                self.line_break();
+                let indent = self.list_indent();
+                self.write(&indent);
                 let ordered = self.list_stack.last().is_some_and(|state| state.ordered);
                 self.write(if ordered { "+ " } else { "- " });
             }
@@ -611,14 +629,14 @@ impl Emitter {
                         .last()
                         .and_then(|parent| parent.start)
                         .unwrap_or(1);
-                    let indent = " ".repeat(self.list_stack.len() * 2);
+                    let indent = self.list_indent();
                     self.write(&format!("{indent}#set enum(start: {restore})\n"));
                 }
                 if self.list_stack.is_empty() {
-                    self.write("\n");
+                    self.line_break();
                 }
             }
-            TagEnd::Item => self.write("\n"),
+            TagEnd::Item => self.line_break(),
             TagEnd::TableHead => {
                 if let Some(table) = &mut self.table {
                     let row = std::mem::take(&mut table.row);
@@ -891,10 +909,22 @@ mod tests {
     fn nested_lists_keep_their_indentation() {
         let doc = parse_ok("- parent\n  - child\n    1. one\n    2. two\n- sibling");
         let body = doc.body();
-        assert!(body.contains("  - parent"), "{body}");
-        assert!(body.contains("    - child"), "{body}");
-        assert!(body.contains("      + one"), "{body}");
+        assert!(body.contains("\n- parent"), "{body}");
+        assert!(body.contains("\n  - child"), "{body}");
+        assert!(body.contains("\n    + one"), "{body}");
         assert!(!body.contains("#set enum(start: 1)"), "{body}");
+    }
+
+    #[test]
+    fn list_items_are_not_separated_by_blank_lines() {
+        let doc = parse_ok("- a\n  - b\n- c\n\n1. one\n2. two\n");
+        let body = doc.body();
+        for marker in ["- ", "  - ", "+ ", "  + "] {
+            assert!(
+                !body.contains(&format!("\n\n{marker}")),
+                "empty line before an item ({marker}): {body}"
+            );
+        }
     }
 
     #[test]
