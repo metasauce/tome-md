@@ -166,6 +166,26 @@ mod tests {
     }
 
     #[test]
+    fn raw_typst_block_renders() {
+        let template = Template::from_source(
+            "#let template(body) = { for element in body { element.content } }",
+            "test.typ",
+            TemplateOptions::default(),
+        )
+        .expect("build template");
+
+        let markdown = "Before\n\n```{=typst}\n#v(1em)\n\n#align(center)[raw]\n```\n\nAfter";
+        let rendered = render(markdown, &template).expect("render raw typst block");
+        assert!(!rendered.pdf.is_empty());
+        assert!(!rendered.typst.contains("{=typst}"), "{}", rendered.typst);
+        assert!(
+            rendered.typst.contains("#align(center)[raw]"),
+            "{}",
+            rendered.typst
+        );
+    }
+
+    #[test]
     fn render_pdf_matches_render() {
         let template = Template::from_source(
             "#let template(title: none, body) = { for element in body { element.content } }",

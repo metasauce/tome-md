@@ -615,9 +615,17 @@ impl Emitter {
             }
             TagEnd::CodeBlock => {
                 if let Some(code) = self.code_block.take() {
-                    let fence = code_fence(&code.text);
                     let body = code.text.strip_suffix('\n').unwrap_or(&code.text);
-                    self.write(&format!("\n{fence}{}\n{body}\n{fence}\n\n", code.lang));
+                    if is_raw_typst(&code.lang) {
+                        // Escape hatch: emit the block body as Typst source,
+                        // separated from its neighbours like any other block.
+                        self.line_break();
+                        self.write(body);
+                        self.write("\n\n");
+                    } else {
+                        let fence = code_fence(&code.text);
+                        self.write(&format!("\n{fence}{}\n{body}\n{fence}\n\n", code.lang));
+                    }
                 }
             }
             TagEnd::List(_) => {
@@ -763,6 +771,12 @@ fn is_typst_special(ch: char) -> bool {
     )
 }
 
+/// Fenced blocks tagged `{=typst}` hold raw Typst source, following pandoc's
+/// raw-block convention. Every other language stays a Typst code block.
+fn is_raw_typst(lang: &str) -> bool {
+    lang.trim().eq_ignore_ascii_case("{=typst}")
+}
+
 /// A raw code fence must be longer than any backtick run in its content.
 fn code_fence(text: &str) -> String {
     let longest = text.split(|c| c != '`').map(str::len).max().unwrap_or(0);
@@ -900,6 +914,47 @@ mod tests {
         let doc = parse_ok("````\n```\ninside\n```\n````\n");
         assert!(
             doc.body().contains("````\n```\ninside\n```\n````"),
+            "body: {}",
+            doc.body()
+        );
+    }
+
+    #[test]
+    fn raw_typst_blocks_are_emitted_verbatim() {
+        let doc = parse_ok("Before\n\n```{=typst}\n#v(1em)\n#pagebreak()\n```\n\nAfter\n");
+        let body = doc.body();
+        assert!(body.contains("\n#v(1em)\n#pagebreak()\n\n"), "body: {body}");
+        assert!(body.contains("Before\n\n#v(1em)"), "body: {body}");
+        assert!(body.contains("#pagebreak()\n\nAfter"), "body: {body}");
+        assert!(!body.contains("{=typst}"), "body: {body}");
+        assert!(!body.contains('`'), "body: {body}");
+    }
+
+    #[test]
+    fn raw_typst_blocks_keep_their_content_unescaped() {
+        let doc = parse_ok("```{=Typst}\n#box[**not bold** $x$]\n```\n");
+        assert!(
+            doc.body().contains("#box[**not bold** $x$]"),
+            "body: {}",
+            doc.body()
+        );
+    }
+
+    #[test]
+    fn typst_code_blocks_stay_fenced() {
+        let doc = parse_ok("```typst\n#v(1em)\n```\n");
+        assert!(
+            doc.body().contains("```typst\n#v(1em)\n```"),
+            "body: {}",
+            doc.body()
+        );
+    }
+
+    #[test]
+    fn raw_typst_blocks_work_inside_blockquotes() {
+        let doc = parse_ok("> Quote\n>\n> ```{=typst}\n> #v(1em)\n> ```\n");
+        assert!(
+            doc.body().contains("#quote(block: true)[") && doc.body().contains("#v(1em)"),
             "body: {}",
             doc.body()
         );

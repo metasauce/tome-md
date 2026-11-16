@@ -20,6 +20,7 @@ tome examples/feature_tour/example.md \
 - paragraphs, bold, italic, strikethrough
 - superscript/subscript via inline `<sup>` / `<sub>` tags
 - inline code and fenced code blocks
+- raw Typst blocks through a `{=typst}` fence
 - links, horizontal rules and hard line breaks
 - ordered, unordered, nested and task lists
 - normal blockquotes and GitHub alerts
