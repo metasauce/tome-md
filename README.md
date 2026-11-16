@@ -8,14 +8,14 @@ small Rust binary.
 ## Installation
 
 Either grab the binary for your platform from the
-[releases page](https://github.com/semohr/tome-md/releases) or build from source.
+[releases page](https://github.com/metasauce/tome-md/releases) or build from source.
 
 ### Build from source
 
 Requires a recent stable Rust toolchain.
 
 ```sh
-git clone https://github.com/semohr/tome-md.git
+git clone https://github.com/metasauce/tome-md.git
 cd tome-md
 cargo install --path cli
 ```
