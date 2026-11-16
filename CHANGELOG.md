@@ -4,6 +4,14 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Added
+
+- A fenced block tagged `{=typst}` passes its body to Typst unchanged, for
+  vertical space, page breaks and layout blocks that Markdown has no syntax
+  for. Any other language hint still renders as a code block.
+
 ## 0.2.1 - 2026-11-16
 
 ### Fixed
