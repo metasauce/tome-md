@@ -73,6 +73,7 @@ This is the next line.
 | Mermaid  | Rendered diagram |   Done |
 | Images   | Render           |   Done |
 | Sup/sub  | Render           |   Done |
+| Typst    | Passthrough      |   Done |
 
 ## Code
 
@@ -81,6 +82,31 @@ def hello(name: str) -> str:
     return f"hello {name}"
 
 print(hello("tome"))
+```
+
+## Raw Typst
+
+A fence tagged `{=typst}` is passed straight to Typst, for layout that
+Markdown cannot express. The source looks like this:
+
+````markdown
+```{=typst}
+#v(2em)
+```
+````
+
+Rendered, the same block adds vertical space here:
+
+```{=typst}
+#v(2em)
+```
+
+A box uses the same escape hatch:
+
+```{=typst}
+#block(fill: luma(240), inset: 8pt, radius: 2pt, width: 100%)[
+  #text(weight: "bold")[Boxed by raw Typst]
+]
 ```
 
 ## Mermaid
