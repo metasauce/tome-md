@@ -29,39 +29,19 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  fmt:
+  check:
+    name: fmt, clippy, test, build
     runs-on: self-hosted
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-rust
         with:
-          components: rustfmt
-          cache: false
+          components: clippy,rustfmt
       - name: Check formatting
         run: cargo fmt --all -- --check
-
-  clippy:
-    runs-on: self-hosted
-    steps:
-      - uses: actions/checkout@v7
-      - uses: ./.github/actions/setup-rust
-        with:
-          components: clippy
       - name: Run clippy
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
-
-  test:
-    runs-on: self-hosted
-    steps:
-      - uses: actions/checkout@v7
-      - uses: ./.github/actions/setup-rust
       - name: Run tests
         run: cargo test --workspace --locked
-
-  build:
-    runs-on: self-hosted
-    steps:
-      - uses: actions/checkout@v7
-      - uses: ./.github/actions/setup-rust
-      - name: Build
+      - name: Build release
         run: cargo build --workspace --locked --release
