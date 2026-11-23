@@ -9,6 +9,9 @@
   set page(paper: "a4", margin: 20mm, numbering: "1")
   set text(font: sans, size: 11pt)
   set par(leading: 0.65em, spacing: 1.1em)
+  // Keep boxes as close to headings as paragraphs are. Spacing collapses to the
+  // larger of the two, so anything below `par.spacing` follows the surroundings.
+  set block(above: 0.7em, below: 0.7em)
 
   show heading: set text(weight: 700)
   show heading.where(level: 1): set text(size: 22pt)
@@ -29,6 +32,8 @@
     stroke: 0.5pt + luma(205),
     radius: 2pt,
     inset: 8pt,
+    above: 0.7em,
+    below: 0.7em,
   )[#text(font: mono, size: 9pt)[#it]]
   show raw.where(block: false): it => box(
     fill: luma(246),
@@ -40,6 +45,8 @@
     fill: luma(246),
     stroke: (left: 2pt + luma(150)),
     inset: (x: 12pt, y: 8pt),
+    above: 0.7em,
+    below: 0.7em,
   )[#it.body]
 
   show link: set text(fill: rgb("#1565c0"))

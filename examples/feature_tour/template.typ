@@ -9,6 +9,9 @@
   set page(paper: "a4", margin: 20mm, numbering: "1")
   set text(font: "Libertinus Serif", size: 10.5pt)
   set par(leading: 0.65em, spacing: 1em)
+  // Boxes should sit as close to headings as paragraphs do. Spacing collapses
+  // to the larger of the two, so keep this below `par.spacing`.
+  set block(above: 0.7em, below: 0.7em)
 
   show heading: set text(weight: "bold")
   show heading.where(level: 1): set text(size: 20pt)
@@ -27,6 +30,8 @@
     fill: luma(246),
     stroke: (left: 2pt + luma(150)),
     inset: (x: 10pt, y: 6pt),
+    above: 0.7em,
+    below: 0.7em,
   )[#it.body]
 
   show raw: set text(font: "DejaVu Sans Mono", size: 9pt)

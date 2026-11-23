@@ -102,7 +102,8 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 ```
 
-CI (`.github/workflows/rust-checks.yml`) runs formatting, clippy, tests and a
-release build for changes touching Rust sources, manifests or the lockfile.
+CI (`.github/workflows/rust-checks.yml`) runs formatting, clippy and tests for
+changes touching Rust sources, manifests or the lockfile. The release build only
+happens when a tag is published, in `.github/workflows/release.yml`.
 The workspace lints turn panics, unwraps and silent error drops into warnings,
 so clippy is the main gate.

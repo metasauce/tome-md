@@ -8,6 +8,8 @@ Supported:
 - headings, paragraphs, emphasis, strong, strikethrough
 - superscript and subscript via inline `<sup>` / `<sub>` tags
 - inline code and fenced code blocks (the language hint is kept on the fence)
+- raw Typst blocks through a `{=typst}` fence, see
+  [Raw Typst blocks](#raw-typst-blocks)
 - ordered lists (including start numbers), unordered lists, nesting, task markers
 - block quotes, tables with header rows and column alignment
 - GitHub alert blockquotes (`> [!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNING]`, `[!CAUTION]`)
@@ -26,6 +28,22 @@ images next to the template or in one of its subfolders.
 
 Unsupported constructs do not fail the render; the emitter just skips what it
 does not model.
+
+## Raw Typst blocks
+
+A fence tagged `{=typst}` goes to Typst unchanged, for layout Markdown cannot
+express:
+
+```{=typst}
+#v(1em)
+#pagebreak()
+```
+
+Every other language hint stays a code block, `typst` included.
+
+> [!WARNING]
+> The block runs with the template's reach: it can read files in the template
+> folder and import packages.
 
 ## Front matter
 
