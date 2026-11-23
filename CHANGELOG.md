@@ -17,6 +17,12 @@ All notable changes to this project are documented here. The format follows
 - Quotes, alerts and code blocks sit as close to a heading as a paragraph does.
   Their 1.2em default spacing used to win over the heading's.
 
+### Changed
+
+- The build compiles OpenSSL from source (`vendor-openssl`) instead of linking
+  the system one, so neither CI nor a local build needs `pkg-config` or
+  `libssl-dev`. The first build takes about a minute longer; caches absorb it.
+
 ## 0.2.1 - 2026-11-16
 
 ### Fixed
