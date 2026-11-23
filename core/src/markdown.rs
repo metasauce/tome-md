@@ -744,17 +744,21 @@ fn alert_kind_name(kind: BlockQuoteKind) -> &'static str {
     }
 }
 
-/// Escape text for Typst markup.
+/// Escape a YAML front-matter scalar for Typst content, preserving hard line breaks.
 pub(crate) fn escape_typst(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
     for ch in text.chars() {
+        if ch == '\n' {
+            out.push_str("#linebreak()");
+            continue;
+        }
         // Front-matter values are wrapped in `[...]`, where a leading `4.`
         // would otherwise become an enumeration. Escaping `.` keeps values
         // like dates as plain text.
         if is_typst_special(ch) || ch == '.' {
             out.push('\\');
         }
-        out.push(if ch == '\n' { ' ' } else { ch });
+        out.push(ch);
     }
     out
 }
@@ -825,6 +829,13 @@ mod tests {
             address.get("street").and_then(MetaValue::as_scalar),
             Some("Beispielallee 28")
         );
+    }
+
+    #[test]
+    fn multiline_frontmatter_scalar_renders_explicit_line_breaks() {
+        let doc = parse_ok("---\ntitle: |-\n  First line\n  Second line\n---\n\n");
+        let title = doc.meta.get("title").expect("title front matter");
+        assert_eq!(title.to_typst(), "[First line#linebreak()Second line]");
     }
 
     #[test]

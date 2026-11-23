@@ -63,6 +63,9 @@ YAML, so nested mappings, sequences, multiline strings and quoted values work:
 
 ```markdown
 ---
+title: |-
+  LÄMMkom Analyse
+  mit Apache Superset
 sender:
   name: Jane Doe
   address: 1 Example Street
@@ -81,6 +84,7 @@ Top-level keys are matched to template parameters; nested mappings become Typst
 dictionaries (`sender.name`, `sender.address`), sequences become arrays, and
 scalars are inserted as Typst content (`subtitle: Hello` becomes `[Hello]`).
 YAML `null` becomes Typst `none`. Keys are case-sensitive.
+Literal block scalar line breaks are preserved as Typst line breaks; use `|-` to strip the final newline.
 
 Invalid YAML aborts rendering with an `invalid front matter` error.
 
