@@ -88,7 +88,27 @@ Literal block scalar line breaks are preserved as Typst line breaks; use `|-` to
 
 Invalid YAML aborts rendering with an `invalid front matter` error.
 
-Unknown keys are ignored and logged at debug level.
+By default, TomeMD uses the whole top-level mapping. To keep site-generator
+metadata such as Docusaurus fields separate from TomeMD template arguments,
+select a mapping with `--fm-section`:
+
+```yaml
+---
+title: Docusaurus page title
+slug: /getting-started
+tome:
+  title: TomeMD document title
+  author: Jane Doe
+---
+```
+
+Run `tome page.mdx --fm-section tome`; only keys inside `tome` are matched to
+template parameters. If the section is absent, TomeMD sees no front-matter
+values. If it is present but is not a YAML mapping, rendering fails with an
+`invalid front matter` error. Without `--fm-section`, the existing flat
+front-matter behavior is unchanged.
+
+Unknown keys in the selected mapping are ignored and logged at debug level.
 
 ## Escaping
 

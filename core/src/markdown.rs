@@ -134,8 +134,11 @@ impl Document {
 }
 
 /// Parse Markdown (optional `key: value` front matter) and emit elements.
-pub fn parse(markdown: &str) -> Result<Document, Error> {
-    let (meta, body) = split_frontmatter(markdown)?;
+///
+/// When `fm_section` is provided, only values from that top-level YAML
+/// mapping are exposed as front-matter metadata.
+pub fn parse(markdown: &str, fm_section: Option<&str>) -> Result<Document, Error> {
+    let (meta, body) = split_frontmatter(markdown, fm_section)?;
     let (elements, has_alerts) = to_elements(body);
     Ok(Document {
         meta,
@@ -192,7 +195,10 @@ fn push_cell(cell: &mut Option<String>, text: &str) {
     }
 }
 
-fn split_frontmatter(input: &str) -> Result<(Meta, &str), Error> {
+fn split_frontmatter<'a>(
+    input: &'a str,
+    fm_section: Option<&str>,
+) -> Result<(Meta, &'a str), Error> {
     let input = input.strip_prefix('\u{feff}').unwrap_or(input);
     let meta = Meta::new();
     let Some((first, mut rest)) = input.split_once('\n') else {
@@ -206,7 +212,7 @@ fn split_frontmatter(input: &str) -> Result<(Meta, &str), Error> {
     loop {
         let Some((line, after)) = rest.split_once('\n') else {
             if rest.trim() == "---" {
-                return Ok((parse_frontmatter(&yaml)?, ""));
+                return Ok((parse_frontmatter(&yaml, fm_section)?, ""));
             }
             return Ok((Meta::new(), input));
         };
@@ -214,7 +220,7 @@ fn split_frontmatter(input: &str) -> Result<(Meta, &str), Error> {
         let line = line.trim_end_matches('\r');
         if line.trim_end() == "---" {
             return Ok((
-                parse_frontmatter(&yaml)?,
+                parse_frontmatter(&yaml, fm_section)?,
                 after.trim_start_matches(['\r', '\n']),
             ));
         }
@@ -227,7 +233,7 @@ fn split_frontmatter(input: &str) -> Result<(Meta, &str), Error> {
     }
 }
 
-fn parse_frontmatter(yaml: &str) -> Result<Meta, Error> {
+fn parse_frontmatter(yaml: &str, fm_section: Option<&str>) -> Result<Meta, Error> {
     if yaml.trim().is_empty() {
         return Ok(Meta::new());
     }
@@ -241,7 +247,24 @@ fn parse_frontmatter(yaml: &str) -> Result<Meta, Error> {
         });
     };
 
-    mapping_to_meta(mapping)
+    let Some(section) = fm_section else {
+        return mapping_to_meta(mapping);
+    };
+
+    let section_value = mapping.into_iter().find_map(|(key, value)| match key {
+        Value::String(key) if key == section => Some(value),
+        _ => None,
+    });
+    let Some(section_value) = section_value else {
+        return Ok(Meta::new());
+    };
+    let Value::Mapping(section_mapping) = section_value else {
+        return Err(Error::FrontMatter {
+            message: format!("front matter section `{section}` must be a YAML mapping"),
+        });
+    };
+
+    mapping_to_meta(section_mapping)
 }
 
 fn mapping_to_meta(mapping: Mapping) -> Result<Meta, Error> {
@@ -804,7 +827,7 @@ mod tests {
     use super::*;
 
     fn parse_ok(input: &str) -> Document {
-        parse(input).expect("parse markdown")
+        parse(input, None).expect("parse markdown")
     }
 
     #[test]
@@ -840,11 +863,46 @@ mod tests {
 
     #[test]
     fn invalid_frontmatter_is_an_error() {
-        let error = parse("---\nsender: [unterminated\n---\n").expect_err("invalid YAML");
+        let error = parse("---\nsender: [unterminated\n---\n", None).expect_err("invalid YAML");
         assert!(
             error.to_string().contains("invalid front matter"),
             "{error}"
         );
+    }
+
+    #[test]
+    fn frontmatter_section_selects_only_its_mapping() {
+        let doc = parse(
+            "---\ntitle: Docusaurus title\nslug: /guide\ntome:\n  title: Tome title\n  author: Jane Doe\n---\n\nBody",
+            Some("tome"),
+        )
+        .expect("parse section front matter");
+
+        assert_eq!(doc.meta.len(), 2);
+        assert_eq!(
+            doc.meta.get("title").and_then(MetaValue::as_scalar),
+            Some("Tome title")
+        );
+        assert_eq!(
+            doc.meta.get("author").and_then(MetaValue::as_scalar),
+            Some("Jane Doe")
+        );
+        assert!(!doc.meta.contains_key("slug"));
+        assert!(doc.body().contains("Body"));
+    }
+
+    #[test]
+    fn missing_frontmatter_section_produces_empty_metadata() {
+        let doc = parse("---\ntitle: Outside\n---\nBody", Some("tome"))
+            .expect("parse missing section");
+        assert!(doc.meta.is_empty());
+    }
+
+    #[test]
+    fn frontmatter_section_must_be_a_mapping() {
+        let error = parse("---\ntome: [one, two]\n---\n", Some("tome"))
+            .expect_err("section is a sequence");
+        assert!(error.to_string().contains("section `tome` must be a YAML mapping"));
     }
 
     #[test]

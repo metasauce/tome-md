@@ -7,7 +7,7 @@ use clap::Parser;
 use tracing::{debug, info};
 use tracing_subscriber::EnvFilter;
 
-use tome_md_core::{Error, Template, TemplateOptions, render, render_pdf};
+use tome_md_core::{Error, RenderOptions, Template, TemplateOptions, render, render_pdf};
 
 /// Compile Markdown to PDF through Typst.
 #[derive(Parser)]
@@ -23,6 +23,10 @@ struct Cli {
     /// Output PDF (defaults to the input path with .pdf)
     #[arg(short, long)]
     output: Option<PathBuf>,
+
+    /// Read TomeMD template values from this front-matter YAML section
+    #[arg(long, value_name = "KEY")]
+    fm_section: Option<String>,
 
     /// Also write the generated Typst source next to the PDF
     #[arg(long)]
@@ -131,15 +135,22 @@ fn run(cli: Cli) -> Result<()> {
         "loaded template"
     );
 
+    let render_options = cli
+        .fm_section
+        .as_deref()
+        .map_or_else(RenderOptions::default, |section| {
+            RenderOptions::default().with_fm_section(section)
+        });
+
     let (typst, pdf) = match &typst_path {
         // The Typst source is only kept when it is written out.
         Some(_) => {
-            let rendered = render(&markdown, &template)
+            let rendered = render(&markdown, &template, &render_options)
                 .with_context(|| format!("could not render `{}`", cli.input.display()))?;
             (Some(rendered.typst), rendered.pdf)
         }
         None => {
-            let pdf = render_pdf(&markdown, &template)
+            let pdf = render_pdf(&markdown, &template, &render_options)
                 .with_context(|| format!("could not render `{}`", cli.input.display()))?;
             (None, pdf)
         }

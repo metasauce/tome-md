@@ -255,6 +255,45 @@ fn plain_template_value_is_a_real_path() {
 }
 
 #[test]
+fn fm_section_selects_template_values_from_nested_mapping() {
+    let dir = temp_dir("fm-section");
+    let template = dir.join("template.typ");
+    fs::write(&template, TEMPLATE).expect("write template");
+    let input = dir.join("input.mdx");
+    fs::write(
+        &input,
+        "---\ntitle: Docusaurus title\nslug: /guide\ntome:\n  title: Tome title\n---\n\nBody\n",
+    )
+    .expect("write input");
+    let output_path = dir.join("out.pdf");
+
+    let output = run(
+        &dir,
+        &[
+            input.as_path(),
+            Path::new("--template"),
+            template.as_path(),
+            Path::new("--fm-section"),
+            Path::new("tome"),
+            Path::new("-o"),
+            output_path.as_path(),
+            Path::new("--keep-typ"),
+        ],
+    );
+
+    assert!(
+        output.status.success(),
+        "rendering failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let typst = fs::read_to_string(dir.join("out.typ")).expect("read generated Typst");
+    assert!(typst.contains("[Tome title]"), "{typst}");
+    assert!(!typst.contains("Docusaurus title"), "{typst}");
+
+    cleanup(&dir);
+}
+
+#[test]
 fn force_allows_overwriting_an_existing_output() {
     let dir = temp_dir("force");
     let template = write_template(&dir);
