@@ -1,6 +1,10 @@
 # Templates
 
-A template is one folder: a `.typ` entry point plus everything it needs.
+A template is a Typst project: one or more `.typ` entry points plus the resources
+those entry points use. A simple template can be a single self-contained folder;
+a project with several layouts can share resources and expose a registry entry
+point that routes to the right layout. Typst is flexible enough to organize this
+however suits the project.
 
 ```
 my-template/
@@ -25,12 +29,42 @@ Pass the entry point explicitly with `-t/--template`; there is no discovery.
 4. match front matter to the signature, pass the element list as `body` and
    call the template.
 
-The folder is self-contained: copy it anywhere and it still works, and its
-assets are not embedded in the binary. Templates can also import Typst Universe
-packages by name; those are downloaded on first use and then served from the
-package cache. System fallback fonts are opt-in via
+The template directory is the resource boundary: Typst can read files beside
+the entry point and import other `.typ` files in the project. Assets are not
+embedded in the binary. A one-layout template can be copied as a self-contained
+folder, while a multi-layout project can keep shared styles, logos, and helper
+functions in common files instead of duplicating them. Typst Universe packages
+can also be imported by name; those are downloaded on first use and then served
+from the package cache. System fallback fonts are opt-in via
 `TemplateOptions::use_system_fonts`; the bundled plain template enables them.
 On-disk templates always get Typst's embedded base fonts plus their own fonts.
+
+## Sharing resources and routing layouts
+
+For example, a project can keep shared page styling in one module and import it
+from multiple layouts:
+
+```
+templates/
+├─ shared/
+│  ├─ brand.typ
+│  └─ logo.svg
+├─ report.typ
+├─ memo.typ
+└─ registry.typ
+```
+
+```typst
+// report.typ and memo.typ can both import this helper.
+#import "shared/brand.typ": pageHeader
+
+#let template(title, body) = {
+  pageHeader(title)
+  for element in body {
+    element.content
+  }
+}
+```
 
 ## Packages
 
