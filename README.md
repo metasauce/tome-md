@@ -107,9 +107,9 @@ it around or share it as a whole.
 
 For a number of examples see the [examples](examples/) folder.
 
-See [docs/templates.md](docs/templates.md) for the full rules and font handling,
-and [docs/integrations.md](docs/integrations.md) for template registries with
-Docusaurus and GitHub Actions.
+See [docs/user/templates.md](docs/user/templates.md) for the full rules and font
+handling, and [docs/user/integrations.md](docs/user/integrations.md) for template
+registries with Docusaurus and GitHub Actions.
 
 ## License
 

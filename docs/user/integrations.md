@@ -1,9 +1,9 @@
 # Integrating with other tools
 
 When TomeMD is part of a larger toolchain, it is often useful to select a
-layout from the document's front matter. Site generators such as Docusaurus
-already use front matter for page metadata, and a GitHub Actions job can render
-different documents.
+layout from the document's front matter. Site generators already use front
+matter for page metadata, and a GitHub Actions job can render different
+documents.
 
 A common problem to solve when integrating tomeMD with site generators is that
 you do not want to specify the template to use for a markdown file as part of the
@@ -67,15 +67,14 @@ we can use them to route into other `.typ` files.
 }
 ```
 
-### Frontmatter
+### Front matter
 
-Docusaurus keeps its own `title` and `slug` fields at the top level.
-To keep things organize we will later pass `--fm-section` so that TomeMD
-matches only the keys nested under `tome`.
+Docusaurus keeps its own `title` and `slug` fields at the top level. To keep
+things organized, we pass `--fm-section` so that TomeMD matches only the keys
+nested under `tome`.
 
-The `layout` value is what is used in our registry from above.
-(This way, template selection stays in the Typst project, and we do not need
-any special wiring inside TomeMD.)
+The `layout` value selects the layout in the registry above. This way, template
+selection stays in the Typst project, and TomeMD needs no special wiring.
 
 ```yaml
 ---
@@ -102,7 +101,6 @@ tome docs/reports/quarter_1.mdx \
   --output build/quarter_1.pdf \
   --force
 ```
-
 
 ### Render in GitHub Actions
 
@@ -153,14 +151,13 @@ jobs:
               --fm-section tome \
               --output "$output" \
               --force
-              done
+          done
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: rendered-reports
           path: build/*.pdf
 ```
-
 
 ### Notes
 
@@ -172,8 +169,8 @@ network access if the templates import uncached Typst Universe packages.
 TomeMD renders Markdown rather than executing Docusaurus. If a page uses MDX
 components, JSX, or Docusaurus-only syntax, preprocess or simplify that content
 before passing it to `tome`; ordinary YAML front matter and Markdown content can
-be passed directly as shown above. We are working on improving TomeMDs handling
-of JSX and html components.
+be passed directly as shown above. We are working on improving TomeMD's handling
+of JSX and HTML components.
 
 The registry imports all its layouts up front. This is a simple, maintainable
 choice for a modest set of templates, but imports are not lazy, so a project

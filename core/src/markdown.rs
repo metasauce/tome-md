@@ -260,7 +260,7 @@ fn parse_frontmatter(yaml: &str, fm_section: Option<&str>) -> Result<Meta, Error
     };
     let Value::Mapping(section_mapping) = section_value else {
         return Err(Error::FrontMatter {
-            message: format!("front matter section `{section}` must be a YAML mapping"),
+            message: format!("section `{section}` must be a YAML mapping"),
         });
     };
 

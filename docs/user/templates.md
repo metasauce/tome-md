@@ -1,11 +1,13 @@
 # Templates
 
-A template is a Typst project: it has single `.typ` entry point plus the resources
-the entry points uses. This can e.g. be other `.typ` files, fonts, or images.
-A simple template is usually a single self-contained folder.
-However, a more involved project with several layouts can share resources and expose
-a registry entry point that routes to the right layout. Typst is flexible enough to
-organize this however suits the project.
+A template is a Typst project: it has a single `.typ` entry point plus the
+resources the entry point uses. This can e.g. be other `.typ` files, fonts, or
+images.
+
+A simple template is usually a single self-contained folder. However, a more involved
+project with several layouts can share resources and expose a registry entry point that
+routes to the right layout. Typst is flexible enough to organize this however fits
+your needs.
 
 ```
 my-template/
@@ -17,28 +19,6 @@ my-template/
 ```
 
 Pass the entry point explicitly with `-t/--template`; there is no discovery.
-
-## How a template is loaded
-
-`Template::from_path` (`core/src/templates/template.rs`) does this:
-
-1. read `template.typ` and inspect the `#let template(...)` signature,
-2. index font metadata from `<template>/fonts/` (and the template root) with
-   `typst-kit`'s `FontStore`; font data is loaded only when used,
-3. serve the other files next to `template.typ` through the Typst virtual file
-   system, so `logo.png` and friends work and are only read when Typst asks,
-4. match front matter to the signature, pass the element list as `body` and
-   call the template.
-
-The template directory is the resource boundary: Typst can read files beside
-the entry point and import other `.typ` files in the project. Assets are not
-embedded in the binary. A one-layout template can be copied as a self-contained
-folder, while a multi-layout project can keep shared styles, logos, and helper
-functions in common files instead of duplicating them. Typst Universe packages
-can also be imported by name; those are downloaded on first use and then served
-from the package cache. System fallback fonts are opt-in via
-`TemplateOptions::use_system_fonts`; the bundled plain template enables them.
-On-disk templates always get Typst's embedded base fonts plus their own fonts.
 
 ## Sharing resources and routing layouts
 
@@ -159,26 +139,14 @@ recipient:
 ```
 
 The template receives `sender` and `recipient` as Typst dictionaries. See
-[markdown.md](markdown.md#front-matter) for the supported YAML forms.
+[markdown.md](../markdown.md#front-matter) for the supported YAML forms.
 
 ## Errors
 
 An explicit `--template` is loaded while clap parses it, so a missing file or an
 invalid signature is a usage error (exit 2). The bundled default is loaded at
 render time, so its failures are runtime errors (exit 1). See
-[development.md](development.md) for the error chain printed by the CLI.
-
-## GitHub alerts
-
-GitHub alert blockquotes render through a small Typst helper that the renderer
-injects only into documents containing an alert. Existing templates continue to
-style ordinary blockquotes normally. Alerts use a self-contained GitHub-style
-block and are not restyled by `show quote` rules; a template can deliberately
-override `_tome_md_github_alert` if it needs a different appearance.
-
-A table inside a blockquote is emitted inline with the quote content so the
-quote structure stays balanced. Such inline tables are not exposed as separate
-`Element::Table` data.
+[development.md](../development.md) for the error chain printed by the CLI.
 
 ## Tables as data
 
@@ -207,17 +175,13 @@ The field is populated by the parser and is never read from front matter.
 This lets a template render the document and still compute totals or summaries
 from the tables in it.
 
+## Fonts
+
+Typst's embedded base fonts (Libertinus Serif, New Computer Modern, DejaVu
+Sans Mono) are always available. To add fonts add them next to the template entry point in a `fonts/` folder, together with their licences and provenance notes.
+
 ## Bundled template
 
 The default is `cli/src/plain.typ`, a single file with no assets. Its signature
 is `plain(title: none, subtitle: none, body)` and it uses system Arial (with
 Liberation Sans / DejaVu Sans fallback).
-
-## Fonts and licences
-
-Typst's embedded base fonts (Libertinus Serif, New Computer Modern, DejaVu
-Sans Mono) are always available, so a template without a `fonts/` folder still
-renders. Most example templates rely on those fonts; `letter-din` bundles
-Source Sans 3. Put additional static fonts in `<template>/fonts/` together with
-their licences and provenance notes; the bundled plain template uses system
-fonts.

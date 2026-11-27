@@ -11,18 +11,28 @@ All notable changes to this project are documented here. The format follows
 - A fenced block tagged `{=typst}` passes its body to Typst unchanged, for
   vertical space, page breaks and layout blocks that Markdown has no syntax
   for. Any other language hint still renders as a code block.
+- `--fm-section <key>` and `RenderOptions::with_fm_section` read template
+  values from one named top-level front-matter mapping. A site generator's
+  `title` and `slug` can then sit next to the keys the template uses, and a
+  registry template can route to a layout from a front-matter value.
+- A guide for selecting layouts from front matter, with Docusaurus and a GitHub
+  Actions workflow, in `docs/user/integrations.md`.
 
 ### Fixed
 
 - Quotes, alerts and code blocks sit as close to a heading as a paragraph does.
   Their 1.2em default spacing used to win over the heading's.
+- Newlines in YAML front-matter scalar values are preserved as Typst line
+  breaks instead of collapsing into spaces.
 
 ### Changed
 
 - The build compiles OpenSSL from source (`vendor-openssl`) instead of linking
   the system one, so neither CI nor a local build needs `pkg-config` or
   `libssl-dev`. The first build takes about a minute longer; caches absorb it.
-- Newlines in YAML front-matter scalar values are preserved as Typst line breaks.
+- `render` and `render_pdf` take a `&RenderOptions`, and `markdown::parse` takes
+  an optional front-matter section. Library callers that do not need a section
+  pass `&RenderOptions::default()`.
 
 ## 0.2.1 - 2026-11-16
 
