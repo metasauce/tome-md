@@ -64,8 +64,8 @@ YAML, so nested mappings, sequences, multiline strings and quoted values work:
 ```markdown
 ---
 title: |-
-  LÄMMkom Analyse
-  mit Apache Superset
+  My Awesome Project
+  with a very long Name
 sender:
   name: Jane Doe
   address: 1 Example Street

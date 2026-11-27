@@ -1,10 +1,11 @@
 # Templates
 
-A template is a Typst project: one or more `.typ` entry points plus the resources
-those entry points use. A simple template can be a single self-contained folder;
-a project with several layouts can share resources and expose a registry entry
-point that routes to the right layout. Typst is flexible enough to organize this
-however suits the project.
+A template is a Typst project: it has single `.typ` entry point plus the resources
+the entry points uses. This can e.g. be other `.typ` files, fonts, or images.
+A simple template is usually a single self-contained folder.
+However, a more involved project with several layouts can share resources and expose
+a registry entry point that routes to the right layout. Typst is flexible enough to
+organize this however suits the project.
 
 ```
 my-template/
