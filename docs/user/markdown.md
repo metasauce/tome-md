@@ -1,7 +1,6 @@
 # Markdown support
 
-Conversion uses [`pulldown-cmark`](https://github.com/raphlinus/pulldown-cmark)
-with all GFM options enabled. The emitter lives in `core/src/markdown.rs`.
+TomeMD reads CommonMark and the common GitHub extensions.
 
 Supported:
 
@@ -26,8 +25,8 @@ Partially supported or not rendered:
 Image paths are resolved in the template folder by Typst, so keep referenced
 images next to the template or in one of its subfolders.
 
-Unsupported constructs do not fail the render; the emitter just skips what it
-does not model.
+Unsupported constructs do not fail the render; TomeMD skips what it cannot
+convert.
 
 ## Raw Typst blocks
 

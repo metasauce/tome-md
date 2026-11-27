@@ -85,7 +85,7 @@ the renderer matches front matter keys by name:
   mappings become Typst dictionaries and sequences become arrays; front matter
   is case-sensitive.
 
-Arguments are emitted in signature order. Duplicate parameters, destructuring,
+Arguments are passed in signature order. Duplicate parameters, destructuring,
 `..args` and a named or missing `body` are rejected at load time. Unused keys
 are ignored and logged at debug level.
 
@@ -139,13 +139,13 @@ recipient:
 ```
 
 The template receives `sender` and `recipient` as Typst dictionaries. See
-[markdown.md](../markdown.md#front-matter) for the supported YAML forms.
+[markdown.md](markdown.md#front-matter) for the supported YAML forms.
 
 ## Errors
 
-An explicit `--template` is loaded while clap parses it, so a missing file or an
-invalid signature is a usage error (exit 2). The bundled default is loaded at
-render time, so its failures are runtime errors (exit 1). See
+An explicit `--template` is loaded before the render starts, so a missing file
+or an invalid signature is a usage error (exit 2). The bundled default is loaded
+at render time, so its failures are runtime errors (exit 1). See
 [development.md](../development.md) for the error chain printed by the CLI.
 
 ## Tables as data
