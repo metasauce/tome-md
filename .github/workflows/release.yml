@@ -59,10 +59,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-latest
+          # Build Linux binaries on Ubuntu 22.04 (glibc 2.35) instead of the
+          # moving latest image, so they run on older Linux distributions too.
+          - os: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
             ext: ""
-          - os: ubuntu-24.04-arm
+          - os: ubuntu-22.04-arm
             target: aarch64-unknown-linux-gnu
             ext: ""
           - os: macos-15-intel
