@@ -6,8 +6,12 @@ All notable changes to this project are documented here. The format follows
 
 ## Unreleased
 
+## 0.2.2 - 2026-11-27
+
 ### Added
 
+- `--fm-section <key>` selects a YAML mapping in front matter as template
+  arguments, keeping site-generator metadata separate from template values.
 - A fenced block tagged `{=typst}` passes its body to Typst unchanged, for
   vertical space, page breaks and layout blocks that Markdown has no syntax
   for. Any other language hint still renders as a code block.
