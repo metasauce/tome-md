@@ -39,17 +39,20 @@ tome notes.md                              # bundled plain template
 tome notes.md -o out/notes.pdf             # explicit output path
 tome notes.md -t my-template/template.typ  # custom template
 tome notes.md --keep-typ                   # keep the generated Typst source
+tome page.mdx --fm-section tome            # use the `tome` front-matter mapping
 ```
 
 ## CLI
 
 ```
-tome <input.md> [--template <template.typ>] [-o <out.pdf>] [--keep-typ] [--force]
+tome <input.md> [--template <template.typ>] [-o <out.pdf>] [--fm-section <key>] [--keep-typ] [--force]
 ```
 
 `--template` points at a `.typ` entry point; without it the bundled plain
-template is used. Existing outputs are rejected unless `--force` is given, and
-paths that would overwrite the template entry point, the input Markdown (or the
+template is used. `--fm-section` optionally selects a top-level YAML mapping
+whose contents supply TomeMD template values. Existing outputs are rejected
+unless `--force` is given, and paths that would overwrite the template entry
+point, the input Markdown (or the
 PDF when `--keep-typ` is set) are always rejected. Exit codes: `0` success, `1`
 render error, `2` usage error.
 
@@ -104,7 +107,9 @@ it around or share it as a whole.
 
 For a number of examples see the [examples](examples/) folder.
 
-See [docs/templates.md](docs/templates.md) for the full rules and font handling.
+See [docs/user/templates.md](docs/user/templates.md) for the full rules and font
+handling, and [docs/user/integrations.md](docs/user/integrations.md) for template
+registries with Docusaurus and GitHub Actions.
 
 ## License
 

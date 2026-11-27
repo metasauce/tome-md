@@ -19,6 +19,20 @@ use typst::{World, WorldExt};
 
 use crate::world::PdfWorld;
 
+/// Options that control how Markdown is interpreted during rendering.
+#[derive(Debug, Clone, Default)]
+pub struct RenderOptions {
+    fm_section: Option<String>,
+}
+
+impl RenderOptions {
+    /// Read template arguments from this top-level front-matter mapping.
+    pub fn with_fm_section(mut self, section: impl Into<String>) -> Self {
+        self.fm_section = Some(section.into());
+        self
+    }
+}
+
 /// A rendered document: the intermediate Typst source and the PDF bytes.
 #[derive(Debug)]
 pub struct Rendered {
@@ -30,8 +44,12 @@ pub struct Rendered {
 ///
 /// Use [`render_pdf`] when the generated Typst source is not needed; that path
 /// skips copying it out of the Typst world.
-pub fn render(markdown: &str, template: &Template) -> Result<Rendered, Error> {
-    let (world, pdf) = render_world(markdown, template)?;
+pub fn render(
+    markdown: &str,
+    template: &Template,
+    options: &RenderOptions,
+) -> Result<Rendered, Error> {
+    let (world, pdf) = render_world(markdown, template, options)?;
     Ok(Rendered {
         typst: world.source_text().to_owned(),
         pdf,
@@ -40,15 +58,23 @@ pub fn render(markdown: &str, template: &Template) -> Result<Rendered, Error> {
 
 /// Render Markdown to PDF bytes with a loaded template, without keeping the
 /// generated Typst source.
-pub fn render_pdf(markdown: &str, template: &Template) -> Result<Vec<u8>, Error> {
-    let (_world, pdf) = render_world(markdown, template)?;
+pub fn render_pdf(
+    markdown: &str,
+    template: &Template,
+    options: &RenderOptions,
+) -> Result<Vec<u8>, Error> {
+    let (_world, pdf) = render_world(markdown, template, options)?;
     Ok(pdf)
 }
 
 /// The shared pipeline. Returns the Typst world so callers can decide whether
 /// to copy the generated source out before dropping it.
-fn render_world(markdown: &str, template: &Template) -> Result<(PdfWorld, Vec<u8>), Error> {
-    let doc = markdown::parse(markdown)?;
+fn render_world(
+    markdown: &str,
+    template: &Template,
+    options: &RenderOptions,
+) -> Result<(PdfWorld, Vec<u8>), Error> {
+    let doc = markdown::parse(markdown, options.fm_section.as_deref())?;
     debug!(
         markdown_bytes = markdown.len(),
         title = doc
@@ -131,7 +157,8 @@ mod tests {
         )
         .expect("build template");
 
-        let error = render("Hello", &template).expect_err("expected a compile error");
+        let error = render("Hello", &template, &RenderOptions::default())
+            .expect_err("expected a compile error");
         let message = error.to_string();
         assert!(message.contains("main.typ:"), "{message}");
     }
@@ -145,7 +172,8 @@ mod tests {
         )
         .expect("build template");
 
-        let rendered = render("> [!NOTE]\n> Body", &template).expect("render alert");
+        let rendered = render("> [!NOTE]\n> Body", &template, &RenderOptions::default())
+            .expect("render alert");
         assert!(!rendered.pdf.is_empty());
         assert!(rendered.typst.contains("_tome_md_github_alert"));
     }
@@ -160,7 +188,8 @@ mod tests {
         .expect("build template");
 
         let markdown = "> [!NOTE]\n> Intro\n>\n> | A | B |\n> | --- | --- |\n> | 1 | 2 |";
-        let rendered = render(markdown, &template).expect("render alert with table");
+        let rendered = render(markdown, &template, &RenderOptions::default())
+            .expect("render alert with table");
         assert!(!rendered.pdf.is_empty());
         assert!(rendered.typst.contains("#table("), "{}", rendered.typst);
     }
@@ -175,7 +204,8 @@ mod tests {
         .expect("build template");
 
         let markdown = "Before\n\n```{=typst}\n#v(1em)\n\n#align(center)[raw]\n```\n\nAfter";
-        let rendered = render(markdown, &template).expect("render raw typst block");
+        let rendered =
+            render(markdown, &template, &RenderOptions::default()).expect("render raw typst block");
         assert!(!rendered.pdf.is_empty());
         assert!(!rendered.typst.contains("{=typst}"), "{}", rendered.typst);
         assert!(
@@ -195,8 +225,9 @@ mod tests {
         .expect("build template");
         let markdown = "# Title\n\nHello, world.";
 
-        let rendered = render(markdown, &template).expect("render");
-        let pdf = render_pdf(markdown, &template).expect("render_pdf");
+        let options = RenderOptions::default();
+        let rendered = render(markdown, &template, &options).expect("render");
+        let pdf = render_pdf(markdown, &template, &options).expect("render_pdf");
 
         assert!(!rendered.typst.is_empty());
         assert_eq!(rendered.pdf, pdf);

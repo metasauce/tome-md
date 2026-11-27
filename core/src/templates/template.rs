@@ -241,7 +241,7 @@ mod tests {
     use crate::markdown;
 
     fn parse(input: &str) -> markdown::Document {
-        markdown::parse(input).expect("parse markdown")
+        markdown::parse(input, None).expect("parse markdown")
     }
 
     #[test]

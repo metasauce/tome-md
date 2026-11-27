@@ -6,7 +6,7 @@
 core/                     tome-md-core library
 ├─ Cargo.toml
 ├─ src/
-│  ├─ lib.rs              render(markdown, template) -> { typst, pdf }
+│  ├─ lib.rs              render(markdown, template, options) -> { typst, pdf }
 │  ├─ error.rs            thiserror error enum
 │  ├─ fonts.rs            selected system fallback metadata
 │  ├─ markdown.rs         Markdown → Typst emitter

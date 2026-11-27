@@ -1,7 +1,6 @@
 # Markdown support
 
-Conversion uses [`pulldown-cmark`](https://github.com/raphlinus/pulldown-cmark)
-with all GFM options enabled. The emitter lives in `core/src/markdown.rs`.
+TomeMD reads CommonMark and the common GitHub extensions.
 
 Supported:
 
@@ -26,8 +25,8 @@ Partially supported or not rendered:
 Image paths are resolved in the template folder by Typst, so keep referenced
 images next to the template or in one of its subfolders.
 
-Unsupported constructs do not fail the render; the emitter just skips what it
-does not model.
+Unsupported constructs do not fail the render; TomeMD skips what it cannot
+convert.
 
 ## Raw Typst blocks
 
@@ -63,6 +62,9 @@ YAML, so nested mappings, sequences, multiline strings and quoted values work:
 
 ```markdown
 ---
+title: |-
+  My Awesome Project
+  with a very long Name
 sender:
   name: Jane Doe
   address: 1 Example Street
@@ -81,10 +83,31 @@ Top-level keys are matched to template parameters; nested mappings become Typst
 dictionaries (`sender.name`, `sender.address`), sequences become arrays, and
 scalars are inserted as Typst content (`subtitle: Hello` becomes `[Hello]`).
 YAML `null` becomes Typst `none`. Keys are case-sensitive.
+Literal block scalar line breaks are preserved as Typst line breaks; use `|-` to strip the final newline.
 
 Invalid YAML aborts rendering with an `invalid front matter` error.
 
-Unknown keys are ignored and logged at debug level.
+By default, TomeMD uses the whole top-level mapping. To keep site-generator
+metadata such as Docusaurus fields separate from TomeMD template arguments,
+select a mapping with `--fm-section`:
+
+```yaml
+---
+title: Docusaurus page title
+slug: /getting-started
+tome:
+  title: TomeMD document title
+  author: Jane Doe
+---
+```
+
+Run `tome page.mdx --fm-section tome`; only keys inside `tome` are matched to
+template parameters. If the section is absent, TomeMD sees no front-matter
+values. If it is present but is not a YAML mapping, rendering fails with an
+`invalid front matter` error. Without `--fm-section`, the existing flat
+front-matter behavior is unchanged.
+
+Unknown keys in the selected mapping are ignored and logged at debug level.
 
 ## Escaping
 
