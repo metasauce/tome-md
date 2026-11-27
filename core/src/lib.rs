@@ -204,7 +204,8 @@ mod tests {
         .expect("build template");
 
         let markdown = "Before\n\n```{=typst}\n#v(1em)\n\n#align(center)[raw]\n```\n\nAfter";
-        let rendered = render(markdown, &template).expect("render raw typst block");
+        let rendered =
+            render(markdown, &template, &RenderOptions::default()).expect("render raw typst block");
         assert!(!rendered.pdf.is_empty());
         assert!(!rendered.typst.contains("{=typst}"), "{}", rendered.typst);
         assert!(
