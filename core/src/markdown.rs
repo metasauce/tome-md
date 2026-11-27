@@ -893,16 +893,20 @@ mod tests {
 
     #[test]
     fn missing_frontmatter_section_produces_empty_metadata() {
-        let doc = parse("---\ntitle: Outside\n---\nBody", Some("tome"))
-            .expect("parse missing section");
+        let doc =
+            parse("---\ntitle: Outside\n---\nBody", Some("tome")).expect("parse missing section");
         assert!(doc.meta.is_empty());
     }
 
     #[test]
     fn frontmatter_section_must_be_a_mapping() {
-        let error = parse("---\ntome: [one, two]\n---\n", Some("tome"))
-            .expect_err("section is a sequence");
-        assert!(error.to_string().contains("section `tome` must be a YAML mapping"));
+        let error =
+            parse("---\ntome: [one, two]\n---\n", Some("tome")).expect_err("section is a sequence");
+        assert!(
+            error
+                .to_string()
+                .contains("section `tome` must be a YAML mapping")
+        );
     }
 
     #[test]

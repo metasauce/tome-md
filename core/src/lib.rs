@@ -172,12 +172,8 @@ mod tests {
         )
         .expect("build template");
 
-        let rendered = render(
-            "> [!NOTE]\n> Body",
-            &template,
-            &RenderOptions::default(),
-        )
-        .expect("render alert");
+        let rendered = render("> [!NOTE]\n> Body", &template, &RenderOptions::default())
+            .expect("render alert");
         assert!(!rendered.pdf.is_empty());
         assert!(rendered.typst.contains("_tome_md_github_alert"));
     }
